@@ -11,7 +11,7 @@ async function manychatRequest(endpoint: string, body: any): Promise<any> {
   const response = await fetch(`${MANYCHAT_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.MANYCHAT_API_KEY}`,
+      'Authorization': config.MANYCHAT_API_KEY,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
