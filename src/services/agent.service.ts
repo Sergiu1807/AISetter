@@ -201,17 +201,22 @@ Fază Curentă: P1
     // Split into chunks
     const chunks = splitIntoMessageChunks(response, 6);
 
-    // Prepare fields (always send 6, empty if not needed)
+    // Prepare fields (only send non-empty fields to avoid ManyChat validation errors)
     const fields: ManyChatCustomField[] = [];
     for (let i = 1; i <= 6; i++) {
-      fields.push({
-        field_name: `AI > Answer ${i}`,
-        field_value: chunks[i - 1] || ''
-      });
+      const chunk = chunks[i - 1];
+      if (chunk && chunk.trim()) {  // Only add non-empty chunks
+        fields.push({
+          field_name: `AI > Answer ${i}`,
+          field_value: chunk
+        });
+      }
     }
 
-    // Set custom fields
-    await manychatClient.setCustomFields(subscriberId, fields);
+    // Set custom fields (only if we have any)
+    if (fields.length > 0) {
+      await manychatClient.setCustomFields(subscriberId, fields);
+    }
 
     // Trigger response flow
     await manychatClient.sendFlow(subscriberId, config.MANYCHAT_RESPONSE_FLOW_ID);
