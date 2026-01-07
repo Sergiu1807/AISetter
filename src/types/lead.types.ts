@@ -1,3 +1,5 @@
+import type { ResponseMeta } from './agent.types';
+
 export interface Lead {
   id: string;
   manychat_user_id: string;
@@ -42,7 +44,7 @@ export interface Message {
   content: string;
   timestamp: string;
   analysis?: string;
-  meta?: Record<string, string>;
+  meta?: ResponseMeta;
 }
 
 export interface CollectedData {

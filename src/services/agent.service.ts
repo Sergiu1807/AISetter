@@ -5,8 +5,8 @@ import { leadService } from './lead.service';
 import { promptService } from './prompt.service';
 import { parserService } from './parser.service';
 import { splitIntoMessageChunks, generateMessageId, getHoursDiff, detectFirstName, sleep } from '@/utils/format';
-import type { ProcessMessageInput } from '@/types/agent.types';
-import type { Lead, ConversationPhase } from '@/types/lead.types';
+import type { ProcessMessageInput, ResponseMeta } from '@/types/agent.types';
+import type { Lead, ConversationPhase, QualificationStatus } from '@/types/lead.types';
 import type { ManyChatCustomField } from '@/types/manychat.types';
 
 const FALLBACK_MESSAGE = "Scuză-mă, am avut o problemă tehnică. Poți să-mi scrii din nou? 🙏";
@@ -164,7 +164,7 @@ Fază Curentă: P1
 </meta>`;
   }
 
-  private updateLeadFromMeta(lead: Lead, meta: Record<string, string>): void {
+  private updateLeadFromMeta(lead: Lead, meta: ResponseMeta): void {
     // Update conversation phase if provided
     if (meta.conversation_phase) {
       const validPhases = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'DONE'];
@@ -175,7 +175,10 @@ Fază Curentă: P1
 
     // Update qualification status if provided
     if (meta.qualification_status) {
-      lead.qualification_status = meta.qualification_status;
+      const validStatuses: QualificationStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture'];
+      if (validStatuses.includes(meta.qualification_status as QualificationStatus)) {
+        lead.qualification_status = meta.qualification_status as QualificationStatus;
+      }
     }
 
     // Update collected data
