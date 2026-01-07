@@ -20,5 +20,5 @@ export const config = {
 
   // App
   CALENDAR_LINK: getEnvVar('CALENDAR_LINK'),
-  WEBHOOK_SECRET: getEnvVar('WEBHOOK_SECRET', true) // Required for security!
+  WEBHOOK_SECRET: getEnvVar('WEBHOOK_SECRET', false) // Optional - ManyChat can't generate HMAC signatures
 };
