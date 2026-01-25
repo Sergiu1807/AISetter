@@ -27,10 +27,10 @@ export interface ManyChatSendFlowRequest {
 
 export interface ManyChatSetFieldsResponse {
   status: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }
 
 export interface ManyChatSendFlowResponse {
   status: string;
-  data?: any;
+  data?: Record<string, unknown>;
 }

@@ -7,7 +7,7 @@ import type {
 
 const MANYCHAT_BASE_URL = 'https://api.manychat.com/fb';
 
-async function manychatRequest(endpoint: string, body: any): Promise<any> {
+async function manychatRequest(endpoint: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const response = await fetch(`${MANYCHAT_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: {
@@ -34,13 +34,13 @@ export const manychatClient = {
     return manychatRequest('/subscriber/setCustomFields', {
       subscriber_id: subscriberId,
       fields
-    });
+    }) as unknown as Promise<ManyChatSetFieldsResponse>;
   },
 
   async sendFlow(subscriberId: string, flowNs: string): Promise<ManyChatSendFlowResponse> {
     return manychatRequest('/sending/sendFlow', {
       subscriber_id: subscriberId,
       flow_ns: flowNs
-    });
+    }) as unknown as Promise<ManyChatSendFlowResponse>;
   }
 };

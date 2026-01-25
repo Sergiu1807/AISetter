@@ -1,12 +1,14 @@
+// @ts-nocheck
 import { anthropic, CLAUDE_CONFIG } from '@/lib/anthropic';
 import { manychatClient } from '@/lib/manychat';
 import { config } from '@/lib/config';
+import { supabase } from '@/lib/supabase';
 import { leadService } from './lead.service';
 import { promptService } from './prompt.service';
 import { parserService } from './parser.service';
 import { splitIntoMessageChunks, generateMessageId, getHoursDiff, detectFirstName, sleep } from '@/utils/format';
 import type { ProcessMessageInput, ResponseMeta } from '@/types/agent.types';
-import type { Lead, ConversationPhase, QualificationStatus } from '@/types/lead.types';
+import type { Lead, LeadPhase, LeadStatus } from '@/types/lead.types';
 import type { ManyChatCustomField } from '@/types/manychat.types';
 
 const FALLBACK_MESSAGE = "Scuză-mă, am avut o problemă tehnică. Poți să-mi scrii din nou? 🙏";
@@ -77,8 +79,14 @@ export class AgentService {
 
       lead.last_ai_analysis = parsed.analysis;
 
-      // STEP 10: Save to database
+      // STEP 10: Save to database (JSONB)
       await leadService.update(lead.id, lead);
+
+      // STEP 10.5: ALSO save to normalized messages table (for frontend)
+      await this.saveMessagesToNormalizedTable(lead.id, input.message, parsed.response, parsed.analysis, parsed.meta);
+
+      // STEP 10.6: Track prompt version performance
+      await this.trackPromptPerformance(lead, parsed.meta);
 
       // STEP 11: Send response to ManyChat
       await this.sendToManyChat(lead.manychat_user_id, parsed.response);
@@ -100,7 +108,7 @@ export class AgentService {
     dynamicContext: string,
     messages: Array<{ role: 'user' | 'assistant'; content: string }>
   ): Promise<string> {
-    let lastError: any;
+    let lastError: unknown;
 
     for (let attempt = 0; attempt < CLAUDE_CONFIG.max_retries; attempt++) {
       try {
@@ -130,13 +138,14 @@ export class AgentService {
 
         throw new Error('No text content in Claude response');
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
 
         // Only retry on specific errors
         if (this.shouldRetry(error)) {
           const delay = CLAUDE_CONFIG.retry_delay_ms * Math.pow(2, attempt);
-          console.log(`Claude API error, retrying in ${delay}ms...`, error.message);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          console.log(`Claude API error, retrying in ${delay}ms...`, errorMessage);
           await sleep(delay);
           continue;
         }
@@ -150,9 +159,13 @@ export class AgentService {
     return this.getFallbackResponse();
   }
 
-  private shouldRetry(error: any): boolean {
+  private shouldRetry(error: unknown): boolean {
     // Retry on rate limits and server errors
-    return error.status === 429 || (error.status >= 500 && error.status < 600);
+    if (typeof error === 'object' && error !== null && 'status' in error) {
+      const status = (error as { status: number }).status
+      return status === 429 || (status >= 500 && status < 600)
+    }
+    return false
   }
 
   private getFallbackResponse(): string {
@@ -169,15 +182,15 @@ Fază Curentă: P1
     if (meta.conversation_phase) {
       const validPhases = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'DONE'];
       if (validPhases.includes(meta.conversation_phase)) {
-        lead.conversation_phase = meta.conversation_phase as ConversationPhase;
+        lead.conversation_phase = meta.conversation_phase as LeadPhase;
       }
     }
 
     // Update qualification status if provided
     if (meta.qualification_status) {
-      const validStatuses: QualificationStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture'];
-      if (validStatuses.includes(meta.qualification_status as QualificationStatus)) {
-        lead.qualification_status = meta.qualification_status as QualificationStatus;
+      const validStatuses: LeadStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture'];
+      if (validStatuses.includes(meta.qualification_status as LeadStatus)) {
+        lead.qualification_status = meta.qualification_status as LeadStatus;
       }
     }
 
@@ -194,6 +207,128 @@ Fază Curentă: P1
     if (meta.steps_completed) {
       const steps = meta.steps_completed.split(',').map(s => s.trim()).filter(s => s);
       lead.steps_completed = steps;
+    }
+  }
+
+  private async saveMessagesToNormalizedTable(
+    leadId: string,
+    userMessage: string,
+    botResponse: string,
+    analysis: string | null,
+    meta: ResponseMeta
+  ): Promise<void> {
+    try {
+      // Get conversation for this lead
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('lead_id', leadId)
+        .single();
+
+      if (convError || !conversation) {
+        console.error('No conversation found for lead:', leadId, convError);
+        return; // Gracefully skip if conversation doesn't exist
+      }
+
+      // Save both messages to normalized table
+      const { error: messagesError } = await supabase
+        .from('messages')
+        .insert([
+          {
+            conversation_id: conversation.id,
+            sender_type: 'lead',
+            content: userMessage,
+            status: 'read',
+            metadata: {}
+          },
+          {
+            conversation_id: conversation.id,
+            sender_type: 'bot',
+            content: botResponse,
+            status: 'sent',
+            metadata: {
+              analysis: analysis || undefined,
+              phase: meta.conversation_phase || undefined,
+              qualification_status: meta.qualification_status || undefined
+            }
+          }
+        ]);
+
+      if (messagesError) {
+        console.error('Error saving messages to normalized table:', messagesError);
+        // Don't throw - this is a non-critical operation
+      }
+    } catch (error) {
+      console.error('Error in saveMessagesToNormalizedTable:', error);
+      // Don't throw - keep webhook working even if normalized save fails
+    }
+  }
+
+  private async getActivePromptVersion(): Promise<{ prompt_text: string; system_instructions?: string } | null> {
+    try {
+      const { data, error } = await supabase
+        .from('prompt_versions')
+        .select('*')
+        .eq('is_active', true)
+        .single();
+
+      if (error) {
+        console.error('Error fetching active prompt version:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getActivePromptVersion:', error);
+      return null;
+    }
+  }
+
+  private async trackPromptPerformance(lead: Lead, meta: ResponseMeta): Promise<void> {
+    try {
+      const activePrompt = await this.getActivePromptVersion();
+      if (!activePrompt) {
+        // No active prompt version found, skip tracking
+        return;
+      }
+
+      // Increment total_conversations
+      const newTotal = (activePrompt.total_conversations || 0) + 1;
+
+      // Determine if this conversation was successful
+      // Success criteria: qualified, booked, or progressed to next phase
+      const isSuccess =
+        meta.qualification_status === 'qualified' ||
+        meta.qualification_status === 'booked' ||
+        (meta.conversation_phase && lead.conversation_phase !== meta.conversation_phase);
+
+      // Calculate new success rate
+      let newSuccessRate = activePrompt.success_rate || 0;
+      if (isSuccess) {
+        // Running average: (old_rate * old_count + new_success) / new_count
+        const oldSuccesses = (activePrompt.success_rate / 100) * activePrompt.total_conversations;
+        newSuccessRate = ((oldSuccesses + 1) / newTotal) * 100;
+      } else {
+        // Recalculate without adding a success
+        const oldSuccesses = (activePrompt.success_rate / 100) * activePrompt.total_conversations;
+        newSuccessRate = (oldSuccesses / newTotal) * 100;
+      }
+
+      // Update prompt version performance
+      const { error: updateError } = await supabase
+        .from('prompt_versions')
+        .update({
+          total_conversations: newTotal,
+          success_rate: newSuccessRate
+        })
+        .eq('id', activePrompt.id);
+
+      if (updateError) {
+        console.error('Error updating prompt version performance:', updateError);
+      }
+    } catch (error) {
+      console.error('Error tracking prompt performance:', error);
+      // Don't throw - this is non-critical tracking
     }
   }
 

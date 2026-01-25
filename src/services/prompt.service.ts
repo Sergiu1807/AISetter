@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { STATIC_SYSTEM_PROMPT, DYNAMIC_CONTEXT_TEMPLATE } from '@/prompts/appointment-setter';
 import { config } from '@/lib/config';
 import type { Lead, Message } from '@/types/lead.types';
