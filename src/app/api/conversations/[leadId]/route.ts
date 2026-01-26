@@ -40,11 +40,45 @@ export async function GET(
       .single()
 
     if (convError) {
-      console.error('Error fetching conversation:', convError)
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      )
+      // Auto-create conversation if it doesn't exist for this lead
+      const { data: newConv, error: createError } = await supabase
+        .from('conversations')
+        .insert({ lead_id: leadId, bot_active: true })
+        .select(
+          `
+          *,
+          taken_over_user:users!taken_over_by(
+            id,
+            full_name
+          )
+        `
+        )
+        .single()
+
+      if (createError || !newConv) {
+        console.error('Error creating conversation:', createError)
+        return NextResponse.json(
+          { error: 'Conversation not found' },
+          { status: 404 }
+        )
+      }
+
+      // Return the newly created conversation with empty messages
+      const nc = newConv as any
+      return NextResponse.json({
+        conversation: {
+          id: nc.id,
+          lead_id: nc.lead_id,
+          bot_active: nc.bot_active,
+          human_taken_over: nc.human_taken_over,
+          taken_over_by: nc.taken_over_by,
+          taken_over_by_name: nc.taken_over_user?.full_name || null,
+          taken_over_at: nc.taken_over_at,
+          created_at: nc.created_at,
+          updated_at: nc.updated_at,
+          messages: [],
+        },
+      }, { status: 200 })
     }
 
     // Get messages for this conversation
