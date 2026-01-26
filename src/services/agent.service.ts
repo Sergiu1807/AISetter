@@ -26,6 +26,12 @@ export class AgentService {
           instagram_handle: input.igUsername ? `@${input.igUsername}` : null,
           lead_source: input.leadSource || 'dm_direct'
         });
+
+        // Create conversation record for the new lead
+        await supabase.from('conversations').insert({
+          lead_id: lead.id,
+          bot_active: true,
+        });
       }
 
       // STEP 2: Check control flags
