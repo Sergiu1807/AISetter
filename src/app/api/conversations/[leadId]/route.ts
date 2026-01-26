@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -41,7 +42,24 @@ export async function GET(
 
     if (convError) {
       // Auto-create conversation if it doesn't exist for this lead
-      const { data: newConv, error: createError } = await supabase
+      // Use admin client to bypass RLS (no INSERT policy on conversations table)
+      const adminSupabase = createAdminClient()
+
+      // First verify the lead exists
+      const { data: leadExists, error: leadCheckError } = await supabase
+        .from('leads')
+        .select('id')
+        .eq('id', leadId)
+        .single()
+
+      if (leadCheckError || !leadExists) {
+        return NextResponse.json(
+          { error: 'Lead not found' },
+          { status: 404 }
+        )
+      }
+
+      const { data: newConv, error: createError } = await adminSupabase
         .from('conversations')
         .insert({ lead_id: leadId, bot_active: true })
         .select(
@@ -58,8 +76,8 @@ export async function GET(
       if (createError || !newConv) {
         console.error('Error creating conversation:', createError)
         return NextResponse.json(
-          { error: 'Conversation not found' },
-          { status: 404 }
+          { error: 'Failed to create conversation' },
+          { status: 500 }
         )
       }
 

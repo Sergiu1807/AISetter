@@ -95,6 +95,18 @@ CREATE POLICY "Users can view conversations for accessible leads" ON public.conv
         )
     );
 
+CREATE POLICY "Users can insert conversations for accessible leads" ON public.conversations
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.leads
+            WHERE leads.id = lead_id
+            AND (
+                public.get_user_role() IN ('admin', 'manager')
+                OR leads.assigned_to = auth.uid()
+            )
+        )
+    );
+
 CREATE POLICY "Users can update conversations for accessible leads" ON public.conversations
     FOR UPDATE USING (
         EXISTS (
