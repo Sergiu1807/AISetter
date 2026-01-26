@@ -6,6 +6,7 @@ import { exportLeadsToCSV } from '@/lib/csvExport'
 import type { Lead, LeadStatus, LeadPhase } from '@/types/lead.types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types/lead.types'
 import { useRealtimeLeads } from '@/hooks/useRealtime'
+import { useIsManager } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -38,11 +40,15 @@ import {
   UserPlus,
   ArrowUpDown,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 10
 
 export default function LeadsPage() {
+  // Role check
+  const canDelete = useIsManager()
+
   // State
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +61,8 @@ export default function LeadsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortColumn, setSortColumn] = useState<keyof Lead | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [deleteTarget, setDeleteTarget] = useState<string | 'bulk' | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Fetch leads from API
   const fetchLeads = useCallback(async () => {
@@ -210,6 +218,49 @@ export default function LeadsPage() {
     exportLeadsToCSV(leadsToExport, `leads-${timestamp}.csv`)
   }
 
+  // Delete handlers
+  const handleDeleteLead = async (leadId: string) => {
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to delete lead')
+      }
+      await fetchLeads()
+    } catch (err) {
+      console.error('Error deleting lead:', err)
+      alert(err instanceof Error ? err.message : 'Failed to delete lead')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setDeleting(true)
+    try {
+      const leadIds = Array.from(selectedLeads)
+      const res = await fetch('/api/leads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_ids: leadIds }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to delete leads')
+      }
+      setSelectedLeads(new Set())
+      await fetchLeads()
+    } catch (err) {
+      console.error('Error deleting leads:', err)
+      alert(err instanceof Error ? err.message : 'Failed to delete leads')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
+
   // Sort handler
   const handleSort = (column: keyof Lead) => {
     if (sortColumn === column) {
@@ -281,6 +332,18 @@ export default function LeadsPage() {
                   <Play className="mr-2 h-4 w-4" />
                   Resume Bot
                 </DropdownMenuItem>
+                {canDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteTarget('bulk')}
+                      className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Leads
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -601,6 +664,18 @@ export default function LeadsPage() {
                           <DropdownMenuItem>
                             {lead.bot_paused ? 'Resume Bot' : 'Pause Bot'}
                           </DropdownMenuItem>
+                          {canDelete && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeleteTarget(lead.id)}
+                                className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Lead
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -661,6 +736,44 @@ export default function LeadsPage() {
           </div>
         )}
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              Confirm Deletion
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              {deleteTarget === 'bulk'
+                ? `Are you sure you want to delete ${selectedLeads.size} lead${selectedLeads.size !== 1 ? 's' : ''}? This will permanently remove all selected leads and their conversation history. This action cannot be undone.`
+                : 'Are you sure you want to delete this lead? This will permanently remove the lead and all conversation history. This action cannot be undone.'}
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (deleteTarget === 'bulk') {
+                    handleBulkDelete()
+                  } else {
+                    handleDeleteLead(deleteTarget)
+                  }
+                }}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

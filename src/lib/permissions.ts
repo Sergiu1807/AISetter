@@ -28,6 +28,7 @@ export type Permission =
   | 'submit:example'
   | 'approve:example'
   | 'export:data'
+  | 'delete:lead'
   | 'manage:users'
   | 'manage:system'
 
@@ -58,6 +59,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[] | '*'> = {
     'submit:example',
     'approve:example',
     'export:data',
+    'delete:lead',
   ],
 
   operator: [

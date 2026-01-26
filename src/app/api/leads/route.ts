@@ -1,6 +1,9 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
+import { manychatClient } from '@/lib/manychat'
 import { NextRequest, NextResponse } from 'next/server'
+
+const MANYCHAT_DELETE_FLOW_NS = 'content20260126074113_204795'
 
 export const dynamic = 'force-dynamic'
 
@@ -195,6 +198,82 @@ export async function POST(request: NextRequest) {
     } as never)
 
     return NextResponse.json({ lead }, { status: 201 })
+  } catch (error) {
+    console.error('Unexpected error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/leads - Bulk delete leads
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+
+    // Check authentication
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check role authorization - only admin and manager can delete leads
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const { lead_ids } = body
+
+    if (!lead_ids || !Array.isArray(lead_ids) || lead_ids.length === 0) {
+      return NextResponse.json(
+        { error: 'lead_ids array is required' },
+        { status: 400 }
+      )
+    }
+
+    // Fetch leads to get manychat_user_ids before deleting
+    const { data: leadsToDelete } = await supabase
+      .from('leads')
+      .select('manychat_user_id')
+      .in('id', lead_ids)
+
+    // Trigger ManyChat delete-contact flow for each lead
+    if (leadsToDelete && leadsToDelete.length > 0) {
+      await Promise.allSettled(
+        leadsToDelete
+          .filter((l) => l.manychat_user_id)
+          .map((l) =>
+            manychatClient.sendFlow(l.manychat_user_id, MANYCHAT_DELETE_FLOW_NS).catch((err) => {
+              console.error('ManyChat delete flow failed for subscriber', l.manychat_user_id, err)
+            })
+          )
+      )
+    }
+
+    // Delete leads (CASCADE handles related data)
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .in('id', lead_ids)
+
+    if (error) {
+      console.error('Error deleting leads:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ message: `${lead_ids.length} lead(s) deleted` }, { status: 200 })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json(

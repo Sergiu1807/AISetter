@@ -1,6 +1,9 @@
 // @ts-nocheck
 import { createClient } from '@/lib/supabase/server'
+import { manychatClient } from '@/lib/manychat'
 import { NextRequest, NextResponse } from 'next/server'
+
+const MANYCHAT_DELETE_FLOW_NS = 'content20260126074113_204795'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,7 +142,40 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check role authorization - only admin and manager can delete leads
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData || (userData.role !== 'admin' && userData.role !== 'manager')) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 })
+    }
+
     const { id } = params
+
+    // Fetch lead to get manychat_user_id before deleting
+    const { data: lead, error: fetchError } = await supabase
+      .from('leads')
+      .select('manychat_user_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      console.error('Error fetching lead for deletion:', fetchError)
+      return NextResponse.json({ error: fetchError.message }, { status: 404 })
+    }
+
+    // Trigger ManyChat delete-contact flow
+    if (lead?.manychat_user_id) {
+      try {
+        await manychatClient.sendFlow(lead.manychat_user_id, MANYCHAT_DELETE_FLOW_NS)
+      } catch (mcError) {
+        console.error('ManyChat delete flow failed for subscriber', lead.manychat_user_id, mcError)
+        // Continue with local deletion even if ManyChat call fails
+      }
+    }
 
     // Delete lead (cascades to conversations and messages)
     const { error } = await supabase.from('leads').delete().eq('id', id)
