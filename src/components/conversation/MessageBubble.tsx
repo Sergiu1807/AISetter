@@ -11,7 +11,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isLead = message.sender_type === 'lead'
   const isHuman = message.sender_type === 'human'
 
-  const colors = SENDER_COLORS[message.sender_type]
+  const colors = SENDER_COLORS[message.sender_type] || SENDER_COLORS['bot']
 
   // Format timestamp
   const formatTime = (timestamp: string) => {

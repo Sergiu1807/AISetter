@@ -31,7 +31,7 @@ export function LeadInfoSidebar({
   onAssign,
   onAddTags,
 }: LeadInfoSidebarProps) {
-  const statusColors = STATUS_COLORS[lead.status]
+  const statusColors = STATUS_COLORS[lead.status] || STATUS_COLORS['new']
 
   // Format time ago
   const formatTimeAgo = (timestamp: string) => {
@@ -74,7 +74,7 @@ export function LeadInfoSidebar({
             <Badge
               className={`${statusColors.bg} ${statusColors.text} border ${statusColors.border}`}
             >
-              {STATUS_LABELS[lead.status]}
+              {STATUS_LABELS[lead.status] || lead.status || 'Unknown'}
             </Badge>
           </div>
           <div className="flex items-center justify-between">
@@ -106,7 +106,7 @@ export function LeadInfoSidebar({
                 Last Activity
               </p>
               <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {formatTimeAgo(lead.last_message_at)}
+                {lead.last_message_at ? formatTimeAgo(lead.last_message_at) : 'N/A'}
               </p>
             </div>
           </div>
@@ -127,7 +127,7 @@ export function LeadInfoSidebar({
       </Card>
 
       {/* Tags */}
-      {lead.tags.length > 0 && (
+      {lead.tags && lead.tags.length > 0 && (
         <Card className="mb-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Tags</CardTitle>
