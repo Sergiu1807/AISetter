@@ -20,10 +20,17 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    // Build query
+    // Build query with related data
     let query = supabase
       .from('training_examples')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        submitted_by_user:users!training_examples_submitted_by_fkey(full_name, email),
+        conversation:conversations(
+          id,
+          leads(name, handle)
+        )
+      `, { count: 'exact' })
 
     // Apply filters
     if (status && status !== 'all') {

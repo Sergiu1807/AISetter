@@ -27,8 +27,22 @@ import {
   XCircle,
   Clock,
   User,
-  Loader2
+  Loader2,
+  MessageSquare
 } from 'lucide-react'
+
+interface ConversationMessage {
+  sender_type: 'bot' | 'lead' | 'human'
+  content: string
+  created_at: string
+}
+
+interface ConversationSnapshot {
+  lead_name: string
+  lead_handle: string
+  captured_at: string
+  messages: ConversationMessage[]
+}
 
 interface TrainingExample {
   id: string
@@ -49,6 +63,10 @@ interface TrainingExample {
       handle: string
     }
   }
+  metadata?: {
+    conversation_snapshot?: ConversationSnapshot
+    reviewer_notes?: string
+  }
 }
 
 export default function ReviewQueuePage() {
@@ -58,6 +76,7 @@ export default function ReviewQueuePage() {
   const [selectedExample, setSelectedExample] = useState<TrainingExample | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewing, setReviewing] = useState(false)
+  const [viewingConversation, setViewingConversation] = useState<TrainingExample | null>(null)
 
   const fetchExamples = useCallback(async () => {
     setLoading(true)
@@ -248,13 +267,24 @@ export default function ReviewQueuePage() {
                         <span>•</span>
                         <span>{formatDate(example.created_at)}</span>
                       </div>
-                      {example.conversation?.leads && (
+                      {(example.conversation?.leads || example.metadata?.conversation_snapshot) && (
                         <>
                           <span className="text-gray-400">•</span>
                           <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {example.conversation.leads.name}
+                            {example.metadata?.conversation_snapshot?.lead_name || example.conversation?.leads?.name}
                           </span>
                         </>
+                      )}
+                      {example.metadata?.conversation_snapshot && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-blue-600 hover:text-blue-700"
+                          onClick={() => setViewingConversation(example)}
+                        >
+                          <MessageSquare className="h-3 w-3 mr-1" />
+                          View Full Conversation
+                        </Button>
                       )}
                     </div>
 
@@ -412,6 +442,68 @@ export default function ReviewQueuePage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Conversation Snapshot Dialog */}
+      <Dialog open={!!viewingConversation} onOpenChange={() => setViewingConversation(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Full Conversation
+            </DialogTitle>
+            <DialogDescription>
+              {viewingConversation?.metadata?.conversation_snapshot && (
+                <>
+                  Conversation with{' '}
+                  <strong>{viewingConversation.metadata.conversation_snapshot.lead_name}</strong>
+                  {' '}(@{viewingConversation.metadata.conversation_snapshot.lead_handle})
+                  {' • '}Captured on{' '}
+                  {new Date(viewingConversation.metadata.conversation_snapshot.captured_at).toLocaleDateString()}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingConversation?.metadata?.conversation_snapshot && (
+            <div className="flex-1 overflow-y-auto space-y-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              {viewingConversation.metadata.conversation_snapshot.messages.length === 0 ? (
+                <p className="text-center text-gray-500">No messages in this conversation</p>
+              ) : (
+                viewingConversation.metadata.conversation_snapshot.messages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg ${
+                      msg.sender_type === 'lead'
+                        ? 'bg-gray-200 dark:bg-gray-800 ml-0 mr-12'
+                        : msg.sender_type === 'bot'
+                        ? 'bg-blue-100 dark:bg-blue-900 ml-12 mr-0'
+                        : 'bg-green-100 dark:bg-green-900 ml-12 mr-0'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                        {msg.sender_type === 'lead' ? 'Lead' : msg.sender_type === 'bot' ? 'Bot' : 'Human'}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(msg.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                      {msg.content}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4">
+            <Button variant="outline" onClick={() => setViewingConversation(null)}>
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

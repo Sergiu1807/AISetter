@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     let user_message = providedUserMessage
     let ai_response = providedAiResponse
     let conversationData = null
+    let conversationSnapshot = null
 
     // Mode 1: From existing conversation
     if (conversation_id) {
@@ -82,23 +83,35 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Get latest messages from conversation
-      const { data: messages, error: msgError } = await supabase
+      // Get ALL messages from conversation for the snapshot
+      const { data: allMessages, error: allMsgError } = await supabase
         .from('messages')
         .select('sender_type, content, created_at')
         .eq('conversation_id', conversation_id)
-        .order('created_at', { ascending: false })
-        .limit(2)
+        .order('created_at', { ascending: true })
 
-      if (msgError) {
-        console.error('Error fetching messages:', msgError)
-        return NextResponse.json({ error: msgError.message }, { status: 500 })
+      if (allMsgError) {
+        console.error('Error fetching messages:', allMsgError)
+        return NextResponse.json({ error: allMsgError.message }, { status: 500 })
       }
 
-      // Extract user and bot messages if not provided
+      // Create conversation snapshot to preserve the full conversation
+      conversationSnapshot = {
+        lead_name: conversation.leads?.name || 'Unknown',
+        lead_handle: conversation.leads?.handle || 'Unknown',
+        captured_at: new Date().toISOString(),
+        messages: allMessages?.map(m => ({
+          sender_type: m.sender_type,
+          content: m.content,
+          created_at: m.created_at
+        })) || []
+      }
+
+      // Extract user and bot messages if not provided (use most recent)
       if (!user_message || !ai_response) {
-        const leadMsg = messages?.find(m => m.sender_type === 'lead')
-        const botMsg = messages?.find(m => m.sender_type === 'bot')
+        const reversedMessages = [...(allMessages || [])].reverse()
+        const leadMsg = reversedMessages.find(m => m.sender_type === 'lead')
+        const botMsg = reversedMessages.find(m => m.sender_type === 'bot')
 
         if (!leadMsg || !botMsg) {
           return NextResponse.json(
@@ -146,9 +159,16 @@ export async function POST(request: NextRequest) {
       created_by: user.id
     }
 
-    // Add context to metadata if provided
+    // Add context and conversation snapshot to metadata
+    const metadata: Record<string, unknown> = {}
     if (context) {
-      trainingData.metadata = context
+      Object.assign(metadata, context)
+    }
+    if (conversationSnapshot) {
+      metadata.conversation_snapshot = conversationSnapshot
+    }
+    if (Object.keys(metadata).length > 0) {
+      trainingData.metadata = metadata
     }
 
     const { data: example, error: insertError } = await supabase
