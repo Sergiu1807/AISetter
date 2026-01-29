@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS training_examples CASCADE;
 -- Create training_examples table with complete schema
 CREATE TABLE training_examples (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
   submitted_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
