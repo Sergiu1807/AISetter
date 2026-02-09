@@ -24,6 +24,9 @@ import {
   FileText,
   BookOpen,
   Sparkles,
+  ChevronDown,
+  ChevronRight,
+  Clock,
 } from 'lucide-react'
 
 interface KBEntry {
@@ -39,6 +42,7 @@ interface PromptVersion {
   version: number
   is_active: boolean
   notes: string | null
+  prompt_text: string | null
   created_at: string
 }
 
@@ -82,6 +86,13 @@ export default function GeneratePromptPage() {
   const [generating, setGenerating] = useState(false)
   const [job, setJob] = useState<GenerationJob | null>(null)
   const pollRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Base prompt preview
+  const [showBasePrompt, setShowBasePrompt] = useState(false)
+
+  // Elapsed time counter
+  const [elapsedTime, setElapsedTime] = useState(0)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   const [loading, setLoading] = useState(true)
 
@@ -143,6 +154,10 @@ export default function GeneratePromptPage() {
           clearInterval(pollRef.current)
           pollRef.current = null
         }
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
       }
     } catch (error) {
       console.error('Error polling job:', error)
@@ -152,6 +167,7 @@ export default function GeneratePromptPage() {
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
+      if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
 
@@ -163,6 +179,8 @@ export default function GeneratePromptPage() {
 
     setGenerating(true)
     setJob(null)
+    setElapsedTime(0)
+    timerRef.current = setInterval(() => setElapsedTime(t => t + 1), 1000)
 
     try {
       const res = await fetch('/api/prompt/generate', {
@@ -213,6 +231,14 @@ export default function GeneratePromptPage() {
     } else {
       setSelectedKbIds(new Set(kbEntries.map(e => e.id)))
     }
+  }
+
+  const selectedBaseVersion = promptVersions.find(v => v.id === baseVersionId)
+
+  const formatElapsed = (seconds: number) => {
+    const m = Math.floor(seconds / 60)
+    const s = seconds % 60
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   // Group KB entries by category
@@ -365,6 +391,32 @@ export default function GeneratePromptPage() {
             </Select>
           </div>
 
+          {/* Base Prompt Preview */}
+          {selectedBaseVersion?.prompt_text && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowBasePrompt(!showBasePrompt)}
+                className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+              >
+                {showBasePrompt ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                Show Base Prompt ({selectedBaseVersion.prompt_text.length.toLocaleString()} chars)
+              </button>
+              {showBasePrompt && (
+                <Textarea
+                  value={selectedBaseVersion.prompt_text}
+                  readOnly
+                  rows={20}
+                  className="font-mono text-xs bg-gray-50 dark:bg-gray-900"
+                />
+              )}
+            </div>
+          )}
+
           {/* User Instructions */}
           <div className="space-y-2">
             <Label>Instructions (Optional)</Label>
@@ -415,6 +467,10 @@ export default function GeneratePromptPage() {
                     ? 'Generating with Claude Opus...'
                     : 'Starting generation...'}
                 </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatElapsed(elapsedTime)} elapsed</span>
+                </div>
                 <p className="text-sm text-gray-500 mt-1">
                   This may take 1-2 minutes. Please don&apos;t close this page.
                 </p>

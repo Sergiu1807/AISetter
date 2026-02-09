@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
         current_prompt: basePrompt.prompt_text,
         knowledge_base_entries: kbSnapshot,
         user_instructions: user_instructions || null,
+        anthropic_api_key: process.env.ANTHROPIC_API_KEY,
       }),
     }).catch(err => {
       console.error('Error invoking edge function:', err)

@@ -318,7 +318,7 @@ export default function KnowledgeBasePage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap line-clamp-4">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap line-clamp-6">
                       {entry.content}
                     </p>
                   </div>
@@ -359,7 +359,7 @@ export default function KnowledgeBasePage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {editingEntry ? 'Edit Entry' : 'Add Knowledge Base Entry'}
@@ -403,9 +403,12 @@ export default function KnowledgeBasePage() {
                 placeholder="Write the knowledge content here... This will be used by the Prompt Engineer Agent to improve the system prompt."
                 value={formContent}
                 onChange={e => setFormContent(e.target.value)}
-                rows={12}
-                className="font-mono text-sm"
+                rows={20}
+                className="font-mono text-sm min-h-[400px]"
               />
+              <p className="text-xs text-gray-500">
+                {formContent.length.toLocaleString()} characters
+              </p>
             </div>
 
             <div className="flex justify-end gap-3">
