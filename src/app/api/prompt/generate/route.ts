@@ -88,18 +88,24 @@ async function runGeneration(
     userMessage += 'Please analyze the training feedback, identify patterns, and produce an improved version of the system prompt that addresses the issues found. Remember to output the complete prompt in <improved_prompt> tags and your changelog in <change_notes> tags.'
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    const modelId = 'claude-opus-4-6'
+    // Sonnet 4.5 — fast enough to complete within Vercel's 300s limit
+    // Opus is too slow for serverless (15-30min on large prompts)
+    const modelId = 'claude-sonnet-4-5-20250929'
 
-    // Use streaming — required by Anthropic for long-running Opus operations
+    // Race the API call against a 270s timeout (30s buffer before Vercel's 300s kill)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Generation timed out after 270s — function will be killed soon')), 270_000)
+    )
+
     const stream = anthropic.messages.stream({
       model: modelId,
-      max_tokens: 32000,
+      max_tokens: 16384,
       temperature: 0.3,
       system: systemMessage,
       messages: [{ role: 'user', content: userMessage }],
     })
 
-    const response = await stream.finalMessage()
+    const response = await Promise.race([stream.finalMessage(), timeoutPromise])
 
     const textContent = response.content.find((c) => c.type === 'text')
     if (!textContent || !('text' in textContent)) {
