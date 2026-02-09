@@ -81,6 +81,7 @@ export default function GeneratePromptPage() {
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [baseVersionId, setBaseVersionId] = useState<string>('')
   const [userInstructions, setUserInstructions] = useState('')
+  const [modelPreference, setModelPreference] = useState<string>('sonnet-4-5')
 
   // Step 3: Generation
   const [generating, setGenerating] = useState(false)
@@ -427,6 +428,27 @@ export default function GeneratePromptPage() {
               rows={3}
             />
           </div>
+
+          {/* Model Selection */}
+          <div className="space-y-2">
+            <Label>AI Model</Label>
+            <Select value={modelPreference} onValueChange={setModelPreference}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sonnet-4-5">
+                  Claude Sonnet 4.5 — Fast (1-3 min)
+                </SelectItem>
+                <SelectItem value="opus-4-6" disabled>
+                  Claude Opus 4.6 — Highest quality (coming soon)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Sonnet 4.5 is fast and produces high-quality prompt improvements.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -443,7 +465,7 @@ export default function GeneratePromptPage() {
             <div className="space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 The Prompt Engineer Agent will analyze your training feedback and generate an improved
-                system prompt. This process uses Claude Opus and may take 1-2 minutes.
+                system prompt. This typically takes 1-3 minutes.
               </p>
               <Button
                 size="lg"
@@ -464,7 +486,7 @@ export default function GeneratePromptPage() {
               <div className="text-center">
                 <p className="font-semibold text-gray-900 dark:text-gray-100">
                   {job?.status === 'processing'
-                    ? 'Generating with Claude Opus...'
+                    ? 'Generating with Claude Sonnet 4.5...'
                     : 'Starting generation...'}
                 </p>
                 <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
