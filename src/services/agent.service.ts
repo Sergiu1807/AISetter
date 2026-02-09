@@ -58,7 +58,7 @@ export class AgentService {
       });
 
       // STEP 5: Build prompt with dynamic context
-      const { staticPrompt, dynamicContext } = promptService.buildPrompt(lead);
+      const { staticPrompt, dynamicContext } = await promptService.buildPrompt(lead);
 
       // STEP 6: Call Claude API with caching and retry logic
       const rawResponse = await this.callClaudeWithRetry(

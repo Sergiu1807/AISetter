@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send, Loader2, Plus, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface Lead {
@@ -17,6 +17,12 @@ interface Lead {
   name: string
   handle: string
   last_message_at: string
+}
+
+interface ConversationTurn {
+  user_message: string
+  ai_response: string
+  feedback: string
 }
 
 function SubmitTrainingPageInner() {
@@ -33,12 +39,10 @@ function SubmitTrainingPageInner() {
   const [expectedResponse, setExpectedResponse] = useState('')
   const [feedback, setFeedback] = useState('')
 
-  // Manual form state
-  const [manualUserMessage, setManualUserMessage] = useState('')
-  const [manualAiResponse, setManualAiResponse] = useState('')
-  const [manualExpectedResponse, setManualExpectedResponse] = useState('')
-  const [manualExampleType, setManualExampleType] = useState<'good' | 'bad' | 'correction'>('good')
-  const [manualFeedback, setManualFeedback] = useState('')
+  // Manual form state - multi-turn conversation
+  const [conversationTurns, setConversationTurns] = useState<ConversationTurn[]>([
+    { user_message: '', ai_response: '', feedback: '' }
+  ])
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -142,11 +146,33 @@ function SubmitTrainingPageInner() {
     }
   }
 
+  const updateTurn = (index: number, field: keyof ConversationTurn, value: string) => {
+    setConversationTurns(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  const addTurn = () => {
+    setConversationTurns(prev => [...prev, { user_message: '', ai_response: '', feedback: '' }])
+  }
+
+  const removeTurn = (index: number) => {
+    if (conversationTurns.length <= 1) return
+    setConversationTurns(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmitManual = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!manualUserMessage.trim() || !manualAiResponse.trim() || !manualFeedback.trim()) {
-      alert('Please fill in all required fields')
-      return
+
+    // Validate all turns have required fields
+    for (let i = 0; i < conversationTurns.length; i++) {
+      const turn = conversationTurns[i]
+      if (!turn.user_message.trim() || !turn.ai_response.trim() || !turn.feedback.trim()) {
+        alert(`Please fill in all required fields for Turn ${i + 1}`)
+        return
+      }
     }
 
     setLoading(true)
@@ -155,11 +181,11 @@ function SubmitTrainingPageInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_message: manualUserMessage,
-          ai_response: manualAiResponse,
-          expected_response: manualExampleType === 'correction' ? manualExpectedResponse : undefined,
-          example_type: manualExampleType,
-          feedback: manualFeedback
+          user_message: conversationTurns[0].user_message,
+          ai_response: conversationTurns[0].ai_response,
+          feedback: conversationTurns[0].feedback,
+          example_type: 'good',
+          conversation_turns: conversationTurns
         })
       })
 
@@ -362,99 +388,99 @@ function SubmitTrainingPageInner() {
         <TabsContent value="manual">
           <Card>
             <CardHeader>
-              <CardTitle>Create Manual Training Example</CardTitle>
+              <CardTitle>Create Manual Conversation Example</CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Provide a full example of how the bot should handle a conversation. Add as many turns as needed.
+              </p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmitManual} className="space-y-6">
-                {/* User Message */}
-                <div className="space-y-2">
-                  <Label htmlFor="user-message">
-                    User Message <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea
-                    id="user-message"
-                    placeholder="What did the user say?"
-                    value={manualUserMessage}
-                    onChange={(e) => setManualUserMessage(e.target.value)}
-                    rows={3}
-                    required
-                  />
-                </div>
+                {/* Conversation Turns */}
+                {conversationTurns.map((turn, index) => (
+                  <div
+                    key={index}
+                    className="relative border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-4"
+                  >
+                    {/* Turn Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          Turn {index + 1}
+                        </Badge>
+                        {index === 0 && conversationTurns.length > 1 && (
+                          <span className="text-xs text-gray-400">Conversation start</span>
+                        )}
+                      </div>
+                      {conversationTurns.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+                          onClick={() => removeTurn(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
 
-                {/* AI Response */}
-                <div className="space-y-2">
-                  <Label htmlFor="ai-response">
-                    Bot Response <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea
-                    id="ai-response"
-                    placeholder="How did the bot respond?"
-                    value={manualAiResponse}
-                    onChange={(e) => setManualAiResponse(e.target.value)}
-                    rows={3}
-                    required
-                  />
-                </div>
+                    {/* User Message */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`user-message-${index}`}>
+                        User Message <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id={`user-message-${index}`}
+                        placeholder="What did the user say?"
+                        value={turn.user_message}
+                        onChange={(e) => updateTurn(index, 'user_message', e.target.value)}
+                        rows={2}
+                        required
+                      />
+                    </div>
 
-                {/* Example Type */}
-                <div className="space-y-2">
-                  <Label>Example Type</Label>
-                  <div className="flex gap-3">
-                    <Button
-                      type="button"
-                      variant={manualExampleType === 'good' ? 'default' : 'outline'}
-                      onClick={() => setManualExampleType('good')}
-                    >
-                      Good Example
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={manualExampleType === 'bad' ? 'default' : 'outline'}
-                      onClick={() => setManualExampleType('bad')}
-                    >
-                      Bad Example
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={manualExampleType === 'correction' ? 'default' : 'outline'}
-                      onClick={() => setManualExampleType('correction')}
-                    >
-                      Needs Correction
-                    </Button>
+                    {/* Bot Response */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`ai-response-${index}`}>
+                        Bot Response <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id={`ai-response-${index}`}
+                        placeholder="How should the bot respond?"
+                        value={turn.ai_response}
+                        onChange={(e) => updateTurn(index, 'ai_response', e.target.value)}
+                        rows={2}
+                        required
+                      />
+                    </div>
+
+                    {/* Feedback */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`feedback-${index}`}>
+                        Why should the bot respond like that? <span className="text-red-500">*</span>
+                      </Label>
+                      <Textarea
+                        id={`feedback-${index}`}
+                        placeholder="Explain the reasoning behind this response..."
+                        value={turn.feedback}
+                        onChange={(e) => updateTurn(index, 'feedback', e.target.value)}
+                        rows={2}
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
+                ))}
 
-                {/* Expected Response (only for corrections) */}
-                {manualExampleType === 'correction' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="manual-expected-response">Expected Response</Label>
-                    <Textarea
-                      id="manual-expected-response"
-                      placeholder="What should the bot have said instead?"
-                      value={manualExpectedResponse}
-                      onChange={(e) => setManualExpectedResponse(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                )}
-
-                {/* Feedback */}
-                <div className="space-y-2">
-                  <Label htmlFor="manual-feedback">
-                    Feedback <span className="text-red-500">*</span>
-                  </Label>
-                  <Textarea
-                    id="manual-feedback"
-                    placeholder="Explain why this is a good/bad example or what needs to be corrected..."
-                    value={manualFeedback}
-                    onChange={(e) => setManualFeedback(e.target.value)}
-                    rows={4}
-                    required
-                  />
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    Be specific about what worked well or what needs improvement
-                  </p>
-                </div>
+                {/* Add Turn Button */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-dashed"
+                  onClick={addTurn}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Another Turn
+                </Button>
 
                 {/* Submit */}
                 <div className="flex justify-end gap-3">

@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
       expected_response,
       feedback,
       example_type,
-      context
+      context,
+      conversation_turns
     } = body
 
     // Validate example_type
@@ -51,7 +52,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!feedback || feedback.trim().length === 0) {
+    // For multi-turn manual examples, validate conversation_turns instead of single feedback
+    if (conversation_turns && Array.isArray(conversation_turns) && conversation_turns.length > 0) {
+      for (let i = 0; i < conversation_turns.length; i++) {
+        const turn = conversation_turns[i]
+        if (!turn.user_message?.trim() || !turn.ai_response?.trim() || !turn.feedback?.trim()) {
+          return NextResponse.json(
+            { error: `All fields are required for turn ${i + 1}` },
+            { status: 400 }
+          )
+        }
+      }
+    } else if (!feedback || feedback.trim().length === 0) {
       return NextResponse.json(
         { error: 'Feedback is required' },
         { status: 400 }
@@ -159,13 +171,16 @@ export async function POST(request: NextRequest) {
       created_by: user.id
     }
 
-    // Add context and conversation snapshot to metadata
+    // Add context, conversation snapshot, and conversation turns to metadata
     const metadata: Record<string, unknown> = {}
     if (context) {
       Object.assign(metadata, context)
     }
     if (conversationSnapshot) {
       metadata.conversation_snapshot = conversationSnapshot
+    }
+    if (conversation_turns && Array.isArray(conversation_turns) && conversation_turns.length > 1) {
+      metadata.conversation_turns = conversation_turns
     }
     if (Object.keys(metadata).length > 0) {
       trainingData.metadata = metadata

@@ -14,7 +14,9 @@ import {
   FileText,
   AlertCircle,
   ArrowUpIcon,
-  ArrowDownIcon
+  ArrowDownIcon,
+  BookOpen,
+  Wand2
 } from 'lucide-react'
 
 interface TrainingStats {
@@ -376,6 +378,18 @@ export default function TrainingPage() {
               <Button variant="outline">
                 <FileText className="h-4 w-4 mr-2" />
                 Prompt Editor
+              </Button>
+            </Link>
+            <Link href="/dashboard/training/knowledge">
+              <Button variant="outline">
+                <BookOpen className="h-4 w-4 mr-2" />
+                Knowledge Base
+              </Button>
+            </Link>
+            <Link href="/dashboard/training/generate">
+              <Button variant="outline">
+                <Wand2 className="h-4 w-4 mr-2" />
+                Prompt Engineer
               </Button>
             </Link>
             <Link href="/dashboard/training/insights">

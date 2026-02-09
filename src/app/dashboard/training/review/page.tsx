@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowLeft,
   CheckCircle,
@@ -28,7 +30,9 @@ import {
   Clock,
   User,
   Loader2,
-  MessageSquare
+  MessageSquare,
+  Download,
+  Wand2
 } from 'lucide-react'
 
 interface ConversationMessage {
@@ -42,6 +46,12 @@ interface ConversationSnapshot {
   lead_handle: string
   captured_at: string
   messages: ConversationMessage[]
+}
+
+interface ConversationTurn {
+  user_message: string
+  ai_response: string
+  feedback: string
 }
 
 interface TrainingExample {
@@ -65,11 +75,13 @@ interface TrainingExample {
   }
   metadata?: {
     conversation_snapshot?: ConversationSnapshot
+    conversation_turns?: ConversationTurn[]
     reviewer_notes?: string
   }
 }
 
 export default function ReviewQueuePage() {
+  const router = useRouter()
   const [examples, setExamples] = useState<TrainingExample[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('pending')
@@ -77,6 +89,10 @@ export default function ReviewQueuePage() {
   const [reviewNotes, setReviewNotes] = useState('')
   const [reviewing, setReviewing] = useState(false)
   const [viewingConversation, setViewingConversation] = useState<TrainingExample | null>(null)
+
+  // Selection state for export
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [exporting, setExporting] = useState(false)
 
   const fetchExamples = useCallback(async () => {
     setLoading(true)
@@ -95,6 +111,7 @@ export default function ReviewQueuePage() {
 
   useEffect(() => {
     fetchExamples()
+    setSelectedIds(new Set()) // Clear selection on filter change
   }, [fetchExamples])
 
   const handleApprove = async (exampleId: string) => {
@@ -160,6 +177,99 @@ export default function ReviewQueuePage() {
     }
   }
 
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAllApproved = () => {
+    const approvedIds = examples.filter(e => e.status === 'approved').map(e => e.id)
+    const allSelected = approvedIds.every(id => selectedIds.has(id))
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(approvedIds))
+    }
+  }
+
+  const handleExport = async () => {
+    if (selectedIds.size === 0) return
+    setExporting(true)
+    try {
+      const res = await fetch('/api/training/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ example_ids: Array.from(selectedIds) })
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        alert(`Export failed: ${error.error || 'Unknown error'}`)
+        return
+      }
+
+      const data = await res.json()
+
+      // Download as text file
+      const blob = new Blob([data.export_text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `training-export-${new Date().toISOString().split('T')[0]}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting:', error)
+      alert('Failed to export examples')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExportAndGenerate = async () => {
+    if (selectedIds.size === 0) return
+    setExporting(true)
+    try {
+      const res = await fetch('/api/training/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ example_ids: Array.from(selectedIds) })
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        alert(`Export failed: ${error.error || 'Unknown error'}`)
+        return
+      }
+
+      const data = await res.json()
+
+      // Store in localStorage for the generate page to pick up
+      localStorage.setItem('training_export', JSON.stringify({
+        export_text: data.export_text,
+        example_count: data.example_count,
+        generated_at: data.generated_at
+      }))
+
+      // Navigate to generation page
+      router.push('/dashboard/training/generate')
+    } catch (error) {
+      console.error('Error exporting:', error)
+      alert('Failed to export examples')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const getExampleTypeBadge = (type: string) => {
     switch (type) {
       case 'good':
@@ -185,6 +295,7 @@ export default function ReviewQueuePage() {
   }
 
   const pendingCount = examples.filter(e => e.status === 'pending').length
+  const approvedExamples = examples.filter(e => e.status === 'approved')
 
   if (loading) {
     return (
@@ -225,20 +336,68 @@ export default function ReviewQueuePage() {
         </div>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-4">
-        <Label>Filter:</Label>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-            <SelectItem value="all">All</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Filter + Export Actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Label>Filter:</Label>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(filter === 'approved' || filter === 'all') && approvedExamples.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleSelectAllApproved}
+            >
+              {approvedExamples.every(e => selectedIds.has(e.id))
+                ? 'Deselect All Approved'
+                : 'Select All Approved'}
+            </Button>
+          )}
+        </div>
+
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {selectedIds.size} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting}
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Export Selected
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExportAndGenerate}
+              disabled={exporting}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {exporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4 mr-2" />
+              )}
+              Export & Generate Prompt
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Examples List */}
@@ -256,11 +415,26 @@ export default function ReviewQueuePage() {
           examples.map((example) => (
             <Card key={example.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  {/* Checkbox for approved examples */}
+                  {example.status === 'approved' && (
+                    <div className="pt-1">
+                      <Checkbox
+                        checked={selectedIds.has(example.id)}
+                        onCheckedChange={() => toggleSelection(example.id)}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex-1 space-y-4">
                     {/* Header */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       {getExampleTypeBadge(example.example_type)}
+                      {example.metadata?.conversation_turns && example.metadata.conversation_turns.length > 1 && (
+                        <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                          {example.metadata.conversation_turns.length} turns
+                        </Badge>
+                      )}
                       <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                         <User className="h-4 w-4" />
                         <span>{example.submitted_by_user?.full_name || 'Unknown'}</span>
@@ -290,35 +464,69 @@ export default function ReviewQueuePage() {
 
                     {/* Messages */}
                     <div className="space-y-3">
-                      <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">User Message</p>
-                        <p className="text-sm text-gray-900 dark:text-gray-100">
-                          {example.user_message}
-                        </p>
-                      </div>
+                      {example.metadata?.conversation_turns && example.metadata.conversation_turns.length > 1 ? (
+                        /* Multi-turn conversation display */
+                        example.metadata.conversation_turns.map((turn, turnIdx) => (
+                          <div key={turnIdx} className="space-y-2">
+                            {example.metadata!.conversation_turns!.length > 1 && (
+                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-2">
+                                Turn {turnIdx + 1}
+                              </p>
+                            )}
+                            <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">User Message</p>
+                              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                {turn.user_message}
+                              </p>
+                            </div>
+                            <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Bot Response</p>
+                              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                {turn.ai_response}
+                              </p>
+                            </div>
+                            <div className="border-l-4 border-yellow-500 pl-3">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Why should the bot respond like that?</p>
+                              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                {turn.feedback}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        /* Single-turn display (backwards compatible) */
+                        <>
+                          <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-lg">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">User Message</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                              {example.user_message}
+                            </p>
+                          </div>
 
-                      <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Bot Response</p>
-                        <p className="text-sm text-gray-900 dark:text-gray-100">
-                          {example.ai_response}
-                        </p>
-                      </div>
+                          <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Bot Response</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                              {example.ai_response}
+                            </p>
+                          </div>
 
-                      {example.expected_response && (
-                        <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Expected Response</p>
-                          <p className="text-sm text-gray-900 dark:text-gray-100">
-                            {example.expected_response}
-                          </p>
-                        </div>
+                          {example.expected_response && (
+                            <div className="bg-green-50 dark:bg-green-950 p-3 rounded-lg">
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Expected Response</p>
+                              <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                                {example.expected_response}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="border-l-4 border-yellow-500 pl-3">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Feedback</p>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+                              {example.feedback}
+                            </p>
+                          </div>
+                        </>
                       )}
-
-                      <div className="border-l-4 border-yellow-500 pl-3">
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Feedback</p>
-                        <p className="text-sm text-gray-900 dark:text-gray-100">
-                          {example.feedback}
-                        </p>
-                      </div>
                     </div>
                   </div>
 
