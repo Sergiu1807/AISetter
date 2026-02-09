@@ -109,6 +109,15 @@ export async function POST(request: NextRequest) {
         user_instructions: user_instructions || null,
         anthropic_api_key: process.env.ANTHROPIC_API_KEY,
       }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.text().catch(() => 'Could not read response body')
+        console.error(`Edge function returned ${res.status}: ${body}`)
+        await adminClient
+          .from('prompt_generation_jobs')
+          .update({ status: 'failed', error_message: `Edge function returned ${res.status}: ${body}` })
+          .eq('id', job.id)
+      }
     }).catch(err => {
       console.error('Error invoking edge function:', err)
       // Update job as failed if we can't even invoke the function

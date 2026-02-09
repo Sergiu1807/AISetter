@@ -471,9 +471,23 @@ export default function GeneratePromptPage() {
                   <Clock className="h-4 w-4" />
                   <span>{formatElapsed(elapsedTime)} elapsed</span>
                 </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Status: {job?.status || 'submitting'}
+                </p>
                 <p className="text-sm text-gray-500 mt-1">
                   This may take 1-2 minutes. Please don&apos;t close this page.
                 </p>
+                {/* Timeout warnings */}
+                {(!job || job.status === 'pending') && elapsedTime > 30 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                    The edge function may have failed to start. If this persists, check the job status or try again.
+                  </p>
+                )}
+                {job?.status === 'processing' && elapsedTime > 300 && (
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                    Generation is taking longer than expected. The AI is processing a large prompt — please wait.
+                  </p>
+                )}
               </div>
             </div>
           )}
