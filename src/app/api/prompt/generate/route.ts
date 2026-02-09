@@ -17,7 +17,7 @@ You are an expert prompt engineer specializing in conversational AI for sales an
 You receive:
 1. **Training feedback document** — Real examples of bot conversations that were flagged as good, bad, or needing correction, with detailed feedback from human trainers. Examples may include **multi-turn conversation snapshots** showing the full back-and-forth between the bot and the lead — use these to understand conversational context, flow issues, and how mistakes compound across multiple turns.
 2. **Current system prompt** — The full prompt currently used by the bot
-3. **Knowledge base entries** — Skill knowledge documents covering sales psychology, objection handling, conversation flow, etc.
+3. **Knowledge base topics** — A summary of available knowledge areas (sales psychology, objection handling, etc.) already embedded in the current prompt
 4. **Optional user instructions** — Specific guidance from the admin about what to focus on or change
 
 ## YOUR ANALYSIS PROCESS
@@ -70,16 +70,12 @@ async function runGeneration(
       .update({ status: 'processing' })
       .eq('id', jobId)
 
-    // Build system message
-    let systemMessage = PROMPT_ENGINEER_SYSTEM
-    if (knowledgeBaseEntries) {
-      systemMessage = systemMessage.replace('{{KNOWLEDGE_BASE_ENTRIES}}', knowledgeBaseEntries)
-    } else {
-      systemMessage = systemMessage.replace('{{KNOWLEDGE_BASE_ENTRIES}}', 'No knowledge base entries provided.')
-    }
-
-    // Build user message
+    // Build user message — KB is sent as titles-only summary to reduce input size
     let userMessage = `## TRAINING FEEDBACK DOCUMENT\n\nThe following are real conversation examples that were flagged by human trainers. Analyze all of them to identify patterns and issues.\n\n${trainingExport}\n\n---\n\n## CURRENT SYSTEM PROMPT\n\nThis is the full system prompt currently being used by the bot. Your output must be a complete replacement of this prompt.\n\n${currentPrompt}\n\n---\n\n`
+
+    if (knowledgeBaseEntries) {
+      userMessage += `## KNOWLEDGE BASE TOPICS (for reference)\n\nThe following knowledge areas are available. The current prompt already incorporates these — use them as context for what the bot should know:\n\n${knowledgeBaseEntries}\n\n---\n\n`
+    }
 
     if (userInstructions) {
       userMessage += `## ADMIN INSTRUCTIONS\n\n${userInstructions}\n\n---\n\n`
@@ -92,9 +88,9 @@ async function runGeneration(
     // Opus is too slow for serverless (15-30min on large prompts)
     const modelId = 'claude-sonnet-4-5-20250929'
 
-    // Race the API call against a 270s timeout (30s buffer before Vercel's 300s kill)
+    // Race the API call against a 290s timeout (10s buffer before Vercel's 300s kill)
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Generation timed out after 270s — function will be killed soon')), 270_000)
+      setTimeout(() => reject(new Error('Generation timed out after 290s — function will be killed soon')), 290_000)
     )
 
     const stream = anthropic.messages.stream({
@@ -263,6 +259,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create generation job' }, { status: 500 })
     }
 
+    // Build a lightweight KB summary for Claude (titles only, not full content)
+    // Full KB is already embodied in the current prompt — titles give context without 57KB overhead
+    const kbSummary = (kbEntries || [])
+      .map(e => `- [${e.category}] ${e.title}`)
+      .join('\n')
+
     // Run generation in the background using waitUntil
     // This keeps the serverless function alive after returning the 202 response
     waitUntil(
@@ -270,7 +272,7 @@ export async function POST(request: NextRequest) {
         job.id,
         training_export,
         basePrompt.prompt_text,
-        kbSnapshot,
+        kbSummary,
         user_instructions || '',
         user.id,
       )
