@@ -6,7 +6,7 @@ export const anthropic = new Anthropic({
 });
 
 export const CLAUDE_CONFIG = {
-  model: 'claude-sonnet-4-5-20250929',
+  model: 'claude-sonnet-4-6-20250514',
   max_tokens: 1024,
   temperature: 0.7,
   max_retries: 3,
