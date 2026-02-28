@@ -106,7 +106,6 @@ export class AgentService {
       // STEP 8.6: Rescue booking if Claude didn't output Action but phase went to DONE
       // Claude sometimes skips <meta> tags during short booking exchanges.
       // This fallback detects phone+email in recent messages and attempts booking.
-      const previousPhase = lead.conversation_phase;
       const newPhase = parsed.meta.conversation_phase;
       const bookingNotTriggered = !parsed.meta.action || parsed.meta.action !== 'book_appointment';
       if (bookingNotTriggered && newPhase === 'DONE' && config.GHL_CALENDAR_ID) {
