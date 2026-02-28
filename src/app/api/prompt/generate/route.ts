@@ -97,7 +97,7 @@ async function runGeneration(
       model: modelId,
       max_tokens: 16384,
       temperature: 0.3,
-      system: systemMessage,
+      system: PROMPT_ENGINEER_SYSTEM,
       messages: [{ role: 'user', content: userMessage }],
     })
 
