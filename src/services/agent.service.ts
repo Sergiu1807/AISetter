@@ -114,7 +114,19 @@ export class AgentService {
       console.log(`[AGENT] Complete in ${Date.now() - startTime}ms`);
 
     } catch (error) {
-      console.error('[AGENT] Error:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[AGENT] Error:', errorMsg, error instanceof Error ? error.stack : '');
+
+      // Save error to DB for debugging (non-blocking)
+      supabase
+        .from('leads')
+        .update({
+          has_errors: true,
+          notes: `[${new Date().toISOString()}] Error: ${errorMsg}`
+        })
+        .eq('manychat_user_id', input.manychatUserId)
+        .then(() => {})
+        .catch(() => {});
 
       // Send fallback message to user
       try {
