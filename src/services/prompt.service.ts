@@ -44,26 +44,29 @@ export class PromptService {
     }
 
     try {
+      // First try with system_instructions column (may not exist yet)
       const { data, error } = await supabase
         .from('prompt_versions')
-        .select('prompt_text, system_instructions')
+        .select('prompt_text')
         .eq('is_active', true)
         .single();
 
       if (error || !data?.prompt_text) {
-        console.warn('No active prompt version found in DB, using hardcoded fallback');
+        console.warn('[PROMPT] No active prompt version found in DB, using hardcoded fallback');
         return { text: STATIC_SYSTEM_PROMPT, dynamicTemplate: null };
       }
+
+      console.log(`[PROMPT] Loaded active prompt from DB (${data.prompt_text.length} chars)`);
 
       // Update cache
       cachedPrompt = {
         text: data.prompt_text,
-        dynamicTemplate: data.system_instructions || null,
+        dynamicTemplate: null,
         fetchedAt: Date.now()
       };
-      return { text: data.prompt_text, dynamicTemplate: data.system_instructions || null };
+      return { text: data.prompt_text, dynamicTemplate: null };
     } catch (error) {
-      console.error('Error fetching active prompt from DB:', error);
+      console.error('[PROMPT] Error fetching active prompt from DB:', error);
       return { text: STATIC_SYSTEM_PROMPT, dynamicTemplate: null };
     }
   }

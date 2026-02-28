@@ -121,6 +121,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Allow up to 60s for Claude API call (default 15s is too short for large prompts)
+export const maxDuration = 60;
+
 // Reject other HTTP methods
 export async function GET() {
   return NextResponse.json(

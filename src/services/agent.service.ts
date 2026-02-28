@@ -15,6 +15,9 @@ const FALLBACK_MESSAGE = "Scuză-mă, am avut o problemă tehnică. Poți să-mi
 
 export class AgentService {
   async processMessage(input: ProcessMessageInput): Promise<void> {
+    const startTime = Date.now();
+    console.log(`[AGENT] Processing message from ${input.manychatUserId.substring(0, 8)}...`);
+
     try {
       // STEP 1: Find or create lead
       let lead = await leadService.findByManychatId(input.manychatUserId);
@@ -58,14 +61,19 @@ export class AgentService {
       });
 
       // STEP 5: Build prompt with dynamic context
+      console.log(`[AGENT] Building prompt for lead ${lead.id.substring(0, 8)}...`);
       const { staticPrompt, dynamicContext } = await promptService.buildPrompt(lead);
+      console.log(`[AGENT] Prompt built (${staticPrompt.length} chars static, ${dynamicContext.length} chars dynamic)`);
 
       // STEP 6: Call Claude API with caching and retry logic
+      console.log(`[AGENT] Calling Claude API...`);
       const rawResponse = await this.callClaudeWithRetry(
         staticPrompt,
         dynamicContext,
         promptService.formatMessagesForClaude(lead.messages)
       );
+
+      console.log(`[AGENT] Claude responded (${rawResponse.length} chars) in ${Date.now() - startTime}ms`);
 
       // STEP 7: Parse response
       const parsed = parserService.parseAgentResponse(rawResponse);
@@ -100,10 +108,13 @@ export class AgentService {
         : FALLBACK_MESSAGE;
 
       // STEP 12: Send response to ManyChat
+      console.log(`[AGENT] Sending to ManyChat (${safeResponse.length} chars)...`);
       await this.sendToManyChat(lead.manychat_user_id, safeResponse);
 
+      console.log(`[AGENT] Complete in ${Date.now() - startTime}ms`);
+
     } catch (error) {
-      console.error('Agent service error:', error);
+      console.error('[AGENT] Error:', error);
 
       // Send fallback message to user
       try {
@@ -347,21 +358,25 @@ Fază Curentă: P1
     // Split into chunks (randomized 1-4 messages for human-like variation)
     const chunks = splitIntoMessageChunks(response, 6);
 
-    // ALWAYS set all 6 fields — empty string for unused slots clears stale values
-    // from previous messages (ManyChat keeps old field values between requests)
+    // Set all 6 fields — use single space " " for unused slots to clear stale values
+    // (ManyChat may reject empty strings "" with 422, but accepts " ")
     const fields: ManyChatCustomField[] = [];
     for (let i = 1; i <= 6; i++) {
       const chunk = chunks[i - 1];
       fields.push({
         field_name: `AI > Answer ${i}`,
-        field_value: (chunk && chunk.trim()) ? chunk : ''
+        field_value: (chunk && chunk.trim()) ? chunk : ' '
       });
     }
+
+    console.log(`[MANYCHAT] Setting ${chunks.length} chunks for subscriber ${subscriberId.substring(0, 8)}...`);
 
     await manychatClient.setCustomFields(subscriberId, fields);
 
     // Trigger response flow to deliver AI answers to the subscriber
     await manychatClient.sendFlow(subscriberId, config.MANYCHAT_RESPONSE_FLOW_ID);
+
+    console.log(`[MANYCHAT] Flow triggered successfully`);
   }
 }
 
