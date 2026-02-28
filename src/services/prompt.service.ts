@@ -5,13 +5,17 @@ import { supabase } from '@/lib/supabase';
 import type { Lead, Message } from '@/types/lead.types';
 
 // In-memory cache for the active prompt version
-let cachedPrompt: { text: string; fetchedAt: number } | null = null;
+let cachedPrompt: { text: string; dynamicTemplate: string | null; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 export class PromptService {
-  async buildPrompt(lead: Lead): Promise<{ staticPrompt: string; dynamicContext: string }> {
-    const staticPrompt = await this.getActivePrompt();
-    const dynamicContext = this.injectVariables(DYNAMIC_CONTEXT_TEMPLATE, {
+  async buildPrompt(
+    lead: Lead,
+    options?: { availableSlots?: string }
+  ): Promise<{ staticPrompt: string; dynamicContext: string }> {
+    const { text: staticPrompt, dynamicTemplate } = await this.getActivePrompt();
+    const template = dynamicTemplate || DYNAMIC_CONTEXT_TEMPLATE;
+    const dynamicContext = this.injectVariables(template, {
       CALENDAR_LINK: config.CALENDAR_LINK,
       LEAD_NAME: lead.name || 'prieten',
       LEAD_HANDLE: lead.instagram_handle || '',
@@ -23,7 +27,8 @@ export class PromptService {
       QUALIFICATION_STATUS: lead.qualification_status || 'Necalificat',
       IDENTIFIED_PAIN_POINTS: lead.collected_data?.pain_points || 'Neidentificate',
       OBJECTIONS: lead.collected_data?.objections || 'Niciuna',
-      STEPS_COMPLETED: (lead.steps_completed || []).join(', ') || 'Niciunul'
+      STEPS_COMPLETED: (lead.steps_completed || []).join(', ') || 'Niciunul',
+      AVAILABLE_SLOTS: options?.availableSlots || '',
     });
 
     return { staticPrompt, dynamicContext };
@@ -32,30 +37,34 @@ export class PromptService {
   /**
    * Fetch the active prompt version from DB, with in-memory cache and fallback.
    */
-  private async getActivePrompt(): Promise<string> {
+  private async getActivePrompt(): Promise<{ text: string; dynamicTemplate: string | null }> {
     // Check cache
     if (cachedPrompt && (Date.now() - cachedPrompt.fetchedAt) < CACHE_TTL_MS) {
-      return cachedPrompt.text;
+      return { text: cachedPrompt.text, dynamicTemplate: cachedPrompt.dynamicTemplate };
     }
 
     try {
       const { data, error } = await supabase
         .from('prompt_versions')
-        .select('prompt_text')
+        .select('prompt_text, system_instructions')
         .eq('is_active', true)
         .single();
 
       if (error || !data?.prompt_text) {
         console.warn('No active prompt version found in DB, using hardcoded fallback');
-        return STATIC_SYSTEM_PROMPT;
+        return { text: STATIC_SYSTEM_PROMPT, dynamicTemplate: null };
       }
 
       // Update cache
-      cachedPrompt = { text: data.prompt_text, fetchedAt: Date.now() };
-      return data.prompt_text;
+      cachedPrompt = {
+        text: data.prompt_text,
+        dynamicTemplate: data.system_instructions || null,
+        fetchedAt: Date.now()
+      };
+      return { text: data.prompt_text, dynamicTemplate: data.system_instructions || null };
     } catch (error) {
       console.error('Error fetching active prompt from DB:', error);
-      return STATIC_SYSTEM_PROMPT;
+      return { text: STATIC_SYSTEM_PROMPT, dynamicTemplate: null };
     }
   }
 
