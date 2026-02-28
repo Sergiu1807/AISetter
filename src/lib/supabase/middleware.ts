@@ -39,7 +39,7 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/api/webhook/manychat', '/api/health']
+  const publicRoutes = ['/login', '/api/webhook/manychat', '/api/health', '/api/debug']
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route))
 
   // If user is not logged in and trying to access protected route
