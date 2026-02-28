@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { waitUntil } from '@vercel/functions';
 import { agentService } from '@/services/agent.service';
 import { config } from '@/lib/config';
 import type { ManyChatWebhookPayload } from '@/types/manychat.types';
@@ -94,16 +95,22 @@ export async function POST(request: NextRequest) {
     // 6. Log incoming webhook (sanitized - only show first 8 chars of ID)
     console.log(`[WEBHOOK] Received message from subscriber ${manychatUserId.substring(0, 8)}...`);
 
-    // 7. Process with agent service
-    await agentService.processMessage({
+    // 7. Process in background — return 200 immediately so ManyChat doesn't timeout
+    // ManyChat has a ~10s webhook timeout. Claude API takes 15-30s.
+    // Without waitUntil, ManyChat retries and eventually stops calling the webhook.
+    const processingPromise = agentService.processMessage({
       manychatUserId,
       firstName,
       lastName,
       igUsername,
       message: userMessage
+    }).catch(error => {
+      console.error('[WEBHOOK] Background processing error:', error);
     });
 
-    // 8. Always return 200
+    waitUntil(processingPromise);
+
+    // 8. Return 200 immediately (ManyChat gets response in <1s)
     return NextResponse.json({ status: 'ok' }, { status: 200 });
 
   } catch (error: unknown) {
@@ -121,7 +128,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Allow up to 60s for Claude API call (default 15s is too short for large prompts)
+// Allow up to 60s for background processing (Claude API + ManyChat delivery)
 export const maxDuration = 60;
 
 // Reject other HTTP methods
