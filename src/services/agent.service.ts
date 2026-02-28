@@ -88,14 +88,19 @@ export class AgentService {
       // STEP 10: Save to database (JSONB)
       await leadService.update(lead.id, lead);
 
-      // STEP 10.5: ALSO save to normalized messages table (for frontend)
-      await this.saveMessagesToNormalizedTable(lead.id, input.message, parsed.response, parsed.analysis, parsed.meta);
+      // STEP 10.5: ALSO save to normalized messages table (fire-and-forget, non-critical)
+      this.saveMessagesToNormalizedTable(lead.id, input.message, parsed.response, parsed.analysis, parsed.meta).catch(() => {});
 
-      // STEP 10.6: Track prompt version performance
-      await this.trackPromptPerformance(lead, parsed.meta);
+      // STEP 10.6: Track prompt version performance (fire-and-forget)
+      this.trackPromptPerformance(lead, parsed.meta).catch(() => {});
 
-      // STEP 11: Send response to ManyChat
-      await this.sendToManyChat(lead.manychat_user_id, parsed.response);
+      // STEP 11: Safety check - never send internal tags to user
+      const safeResponse = parsed.response && !/<(thinking|analysis|meta)>/i.test(parsed.response)
+        ? parsed.response
+        : FALLBACK_MESSAGE;
+
+      // STEP 12: Send response to ManyChat
+      await this.sendToManyChat(lead.manychat_user_id, safeResponse);
 
     } catch (error) {
       console.error('Agent service error:', error);

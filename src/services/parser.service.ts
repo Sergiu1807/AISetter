@@ -8,24 +8,31 @@ export class ParserService {
       meta: {}
     };
 
+    // Strip <thinking> blocks first - Sonnet 4.6 may emit these
+    const cleaned = rawResponse.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+
     // Extract <analysis>
-    const analysisMatch = rawResponse.match(/<analysis>([\s\S]*?)<\/analysis>/);
+    const analysisMatch = cleaned.match(/<analysis>([\s\S]*?)<\/analysis>/);
     if (analysisMatch) {
       result.analysis = analysisMatch[1].trim();
     }
 
     // Extract <response> - THIS IS CRITICAL
-    const responseMatch = rawResponse.match(/<response>([\s\S]*?)<\/response>/);
+    const responseMatch = cleaned.match(/<response>([\s\S]*?)<\/response>/);
     if (responseMatch) {
       result.response = responseMatch[1].trim();
     } else {
-      // Fallback: if no tags, use the whole response (shouldn't happen)
-      console.warn('No <response> tags found in Claude output, using raw response');
-      result.response = rawResponse.trim();
+      // Fallback: strip all known tags, never return raw tagged content
+      console.warn('No <response> tags found in Claude output, using cleaned fallback');
+      result.response = cleaned
+        .replace(/<analysis>[\s\S]*?<\/analysis>/g, '')
+        .replace(/<meta>[\s\S]*?<\/meta>/g, '')
+        .replace(/<\/?[a-z_]+>/g, '')
+        .trim();
     }
 
     // Extract <meta>
-    const metaMatch = rawResponse.match(/<meta>([\s\S]*?)<\/meta>/);
+    const metaMatch = cleaned.match(/<meta>([\s\S]*?)<\/meta>/);
     if (metaMatch) {
       const metaText = metaMatch[1];
 
