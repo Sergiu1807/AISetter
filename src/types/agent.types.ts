@@ -13,6 +13,22 @@ export interface ResponseMeta {
   next_goal?: string;
   risk_factors?: string;
   red_flags?: string;
+  // Escalation fields (Human-in-the-Loop)
+  escalation?: string;
+  escalation_reason?: string;
+  // Booking fields (GHL Calendar)
+  action?: string;
+  selected_slot?: string;
+  contact_phone?: string;
+  contact_email?: string;
+}
+
+export interface MediaAttachment {
+  type: 'image' | 'voice_transcript' | 'video';
+  imageBase64?: string;
+  imageMediaType?: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+  transcript?: string;
+  videoTranscript?: string;
 }
 
 export interface ProcessMessageInput {
@@ -22,4 +38,5 @@ export interface ProcessMessageInput {
   igUsername?: string;
   message: string;
   leadSource?: string;
+  mediaAttachments?: MediaAttachment[];
 }

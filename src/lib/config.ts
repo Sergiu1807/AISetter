@@ -20,5 +20,16 @@ export const config = {
 
   // App
   CALENDAR_LINK: getEnvVar('CALENDAR_LINK'),
-  WEBHOOK_SECRET: getEnvVar('WEBHOOK_SECRET', false) // Optional - ManyChat can't generate HMAC signatures
+  WEBHOOK_SECRET: getEnvVar('WEBHOOK_SECRET', false), // Optional - ManyChat can't generate HMAC signatures
+
+  // OpenAI (for media processing: image vision, voice transcription)
+  OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY', false),
+
+  // Telegram (for escalation notifications)
+  TELEGRAM_BOT_TOKEN: getEnvVar('TELEGRAM_BOT_TOKEN', false),
+  TELEGRAM_CHAT_ID: getEnvVar('TELEGRAM_CHAT_ID', false),
+
+  // GoHighLevel (for calendar booking)
+  GHL_LOCATION_ID: getEnvVar('GHL_LOCATION_ID', false),
+  GHL_CALENDAR_ID: getEnvVar('GHL_CALENDAR_ID', false),
 };

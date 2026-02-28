@@ -45,7 +45,15 @@ export class ParserService {
         { key: 'steps_completed', pattern: /Pași Bifați:\s*(.+?)(?:\n|$)/ },
         { key: 'next_goal', pattern: /Următorul Scop:\s*(.+?)(?:\n|$)/ },
         { key: 'risk_factors', pattern: /Factori de Risc:\s*(.+?)(?:\n|$)/ },
-        { key: 'red_flags', pattern: /Red Flags Observate:\s*(.+?)(?:\n|$)/ }
+        { key: 'red_flags', pattern: /Red Flags Observate:\s*(.+?)(?:\n|$)/ },
+        // Escalation fields (Human-in-the-Loop)
+        { key: 'escalation', pattern: /Escalation:\s*(.+?)(?:\n|$)/ },
+        { key: 'escalation_reason', pattern: /Escalation Reason:\s*(.+?)(?:\n|$)/ },
+        // Booking fields (GHL Calendar)
+        { key: 'action', pattern: /Action:\s*(.+?)(?:\n|$)/ },
+        { key: 'selected_slot', pattern: /Selected Slot:\s*(.+?)(?:\n|$)/ },
+        { key: 'contact_phone', pattern: /Contact Phone:\s*(.+?)(?:\n|$)/ },
+        { key: 'contact_email', pattern: /Contact Email:\s*(.+?)(?:\n|$)/ }
       ];
 
       for (const { key, pattern } of fields) {
