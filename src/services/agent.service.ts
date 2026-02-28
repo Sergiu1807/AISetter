@@ -344,27 +344,23 @@ Fază Curentă: P1
   }
 
   private async sendToManyChat(subscriberId: string, response: string): Promise<void> {
-    // Split into chunks
+    // Split into chunks (randomized 1-4 messages for human-like variation)
     const chunks = splitIntoMessageChunks(response, 6);
 
-    // Prepare fields (only send non-empty fields to avoid ManyChat validation errors)
+    // ALWAYS set all 6 fields — empty string for unused slots clears stale values
+    // from previous messages (ManyChat keeps old field values between requests)
     const fields: ManyChatCustomField[] = [];
     for (let i = 1; i <= 6; i++) {
       const chunk = chunks[i - 1];
-      if (chunk && chunk.trim()) {  // Only add non-empty chunks
-        fields.push({
-          field_name: `AI > Answer ${i}`,
-          field_value: chunk
-        });
-      }
+      fields.push({
+        field_name: `AI > Answer ${i}`,
+        field_value: (chunk && chunk.trim()) ? chunk : ''
+      });
     }
 
-    // Set custom fields (only if we have any)
-    if (fields.length > 0) {
-      await manychatClient.setCustomFields(subscriberId, fields);
-    }
+    await manychatClient.setCustomFields(subscriberId, fields);
 
-    // Trigger response flow
+    // Trigger response flow to deliver AI answers to the subscriber
     await manychatClient.sendFlow(subscriberId, config.MANYCHAT_RESPONSE_FLOW_ID);
   }
 }

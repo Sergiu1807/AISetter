@@ -3,7 +3,7 @@ import type { Message } from '@/types/lead.types';
 
 /**
  * Split response into message chunks for ManyChat (max 6 chunks)
- * Strategy: Split by \n\n (paragraphs) first, then by sentences if needed
+ * Uses weighted randomization (1-4 chunks) for human-like message variation
  */
 export function splitIntoMessageChunks(text: string, maxChunks: number = 6): string[] {
   if (!text || text.trim().length === 0) {
@@ -12,54 +12,100 @@ export function splitIntoMessageChunks(text: string, maxChunks: number = 6): str
 
   const trimmedText = text.trim();
 
-  // Check for explicit \n\n delimiters (paragraph breaks)
+  // Step 1: Split by paragraph breaks (Claude's intended message boundaries)
+  let segments: string[];
   if (trimmedText.includes('\n\n')) {
-    const segments = trimmedText
+    segments = trimmedText
       .split(/\n\s*\n+/)
       .map(s => s.trim())
       .filter(s => s.length > 0);
+  } else if (trimmedText.length < 200) {
+    return [trimmedText]; // Short messages stay as one
+  } else {
+    // No paragraph breaks in a longer message: split by sentences
+    segments = splitBySentences(trimmedText);
+  }
 
-    if (segments.length <= maxChunks) {
-      return segments;
+  // Step 2: Determine target chunk count (randomized, weighted toward 1-3)
+  const targetChunks = getRandomChunkTarget(segments.length);
+
+  // Step 3: Merge segments to match target
+  const finalChunks = mergeToTarget(segments, targetChunks);
+
+  // Step 4: Cap at ManyChat max
+  return finalChunks.slice(0, maxChunks);
+}
+
+/**
+ * Weighted random chunk target:
+ * 1 chunk: 25%, 2 chunks: 35%, 3 chunks: 25%, 4 chunks: 15%
+ */
+function getRandomChunkTarget(availableSegments: number): number {
+  const rand = Math.random();
+  let target: number;
+
+  if (rand < 0.25) target = 1;
+  else if (rand < 0.60) target = 2;
+  else if (rand < 0.85) target = 3;
+  else target = 4;
+
+  // Can't have more chunks than segments
+  return Math.min(target, availableSegments);
+}
+
+/**
+ * Merge segments down to the target count by combining shortest adjacent pairs
+ */
+function mergeToTarget(segments: string[], target: number): string[] {
+  if (segments.length <= target) {
+    return segments;
+  }
+
+  const result = [...segments];
+
+  while (result.length > target) {
+    // Find the pair of adjacent segments with the smallest combined length
+    let minCombinedLength = Infinity;
+    let mergeIndex = 0;
+
+    for (let i = 0; i < result.length - 1; i++) {
+      const combinedLength = result[i].length + result[i + 1].length;
+      if (combinedLength < minCombinedLength) {
+        minCombinedLength = combinedLength;
+        mergeIndex = i;
+      }
     }
 
-    // Combine overflow into last chunk
-    const result = segments.slice(0, maxChunks - 1);
-    result.push(segments.slice(maxChunks - 1).join('\n\n'));
-    return result;
+    // Merge the pair
+    result[mergeIndex] = result[mergeIndex] + '\n' + result[mergeIndex + 1];
+    result.splice(mergeIndex + 1, 1);
   }
 
-  // Short messages - keep as single chunk
-  if (trimmedText.length < 200) {
-    return [trimmedText];
-  }
+  return result;
+}
 
-  // Split by sentences
-  const sentences = trimmedText.match(/[^.!?]+[.!?]+/g) || [trimmedText];
-  const chunks: string[] = [];
-  let currentChunk = '';
+/**
+ * Split a single long text block into sentence-based segments
+ */
+function splitBySentences(text: string): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  const segments: string[] = [];
+  let current = '';
 
   for (const sentence of sentences) {
-    if (currentChunk.length + sentence.length > 300 && currentChunk.length > 0) {
-      chunks.push(currentChunk.trim());
-      currentChunk = sentence;
+    if (current.length + sentence.length > 300 && current.length > 0) {
+      segments.push(current.trim());
+      current = sentence;
     } else {
-      currentChunk += sentence;
-    }
-
-    if (chunks.length >= maxChunks - 1 && sentences.indexOf(sentence) < sentences.length - 1) {
-      // Add remaining to last chunk
-      const remainingIndex = sentences.indexOf(sentence) + 1;
-      currentChunk += sentences.slice(remainingIndex).join('');
-      break;
+      current += sentence;
     }
   }
 
-  if (currentChunk.trim()) {
-    chunks.push(currentChunk.trim());
+  if (current.trim()) {
+    segments.push(current.trim());
   }
 
-  return chunks.slice(0, maxChunks);
+  return segments;
 }
 
 /**
