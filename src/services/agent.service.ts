@@ -300,22 +300,22 @@ Fază Curentă: P1
   /**
    * Rescue booking when Claude didn't output Action: book_appointment in meta.
    * This is the PRIMARY booking path since Claude almost never emits the action.
-   * Scans ALL user messages for phone + email, matches confirmed slot against GHL.
+   *
+   * Strategy: Find the LAST bot message that confirmed a specific time+date,
+   * then match that against available GHL slots. This avoids false matches
+   * from slots mentioned for different days earlier in the conversation.
    */
   private async rescueBookingIfNeeded(lead: Lead): Promise<void> {
-    // Already booked?
     if (lead.qualification_status === 'booked') return;
 
-    // Scan ALL user messages for phone and email (not just last 5)
-    const allUserMessages = (lead.messages || [])
+    // Scan ALL user messages for phone and email
+    const allUserText = (lead.messages || [])
       .filter(m => m.role === 'user')
       .map(m => m.content)
       .join(' ');
 
-    // Extract phone (Romanian format: 07XX XXX XXX or +40...)
-    const phoneMatch = allUserMessages.match(/(?:\+?40|0)7\d{8}/);
-    // Extract email
-    const emailMatch = allUserMessages.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    const phoneMatch = allUserText.match(/(?:\+?40|0)7\d{8}/);
+    const emailMatch = allUserText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
 
     if (!phoneMatch || !emailMatch) {
       console.log('[RESCUE] No phone/email found in messages, skipping');
@@ -326,82 +326,89 @@ Fază Curentă: P1
     const email = emailMatch[0];
     console.log(`[RESCUE] Found contact: phone=${phone}, email=${email}`);
 
-    // Get available slots
+    // Get available GHL slots
     const slots = await calendarService.getFormattedSlots();
     if (slots.length === 0) {
-      console.log('[RESCUE] No available slots, skipping');
+      console.log('[RESCUE] No available slots from GHL, skipping');
       return;
     }
+    console.log(`[RESCUE] ${slots.length} GHL slots available`);
 
-    // Look at ALL bot messages (not just last 5) for confirmed times
-    const allBotMessages = (lead.messages || [])
-      .filter(m => m.role === 'assistant')
-      .map(m => m.content)
-      .join(' ');
+    // Find the LAST bot message that confirmed a booking (contains time confirmation keywords)
+    const botMessages = (lead.messages || []).filter(m => m.role === 'assistant');
+    const confirmKeywords = /notat|programat|confirm|sun.*la|apelul|te astept/i;
 
-    // Also check user messages — user might have said "la 14:00" or "14:00 merge"
-    const allMessages = allUserMessages + ' ' + allBotMessages;
+    let confirmationMessage = '';
+    for (let i = botMessages.length - 1; i >= 0; i--) {
+      if (confirmKeywords.test(botMessages[i].content)) {
+        confirmationMessage = botMessages[i].content;
+        break;
+      }
+    }
 
-    // Try to match a slot mentioned in the conversation
-    // Strategy: find ALL slots matching hour+day, prefer the LAST one discussed
+    // Also check the last 3 bot messages as fallback
+    if (!confirmationMessage) {
+      confirmationMessage = botMessages.slice(-3).map(m => m.content).join(' ');
+    }
+
+    console.log(`[RESCUE] Confirmation message: "${confirmationMessage.substring(0, 150)}..."`);
+
+    // Match slot against the confirmation message specifically (not entire conversation)
     let matchedSlot = null;
+
     for (const slot of slots) {
       const slotDate = new Date(slot.iso);
       const roDate = new Date(slotDate.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
       const hour = roDate.getHours();
-      const dayNum = roDate.getDate();
-
-      // Match hour in format "14:00" or "la 14" or "ora 14"
       const hourStr = hour.toString().padStart(2, '0');
-      const hourPattern = new RegExp(`(?:${hour}:00|${hourStr}:00|\\bla\\s+${hour}\\b|\\bora\\s+${hour}\\b|\\b${hour}:00\\b)`);
-      const dayPattern = new RegExp(`\\b${dayNum}\\b`);
 
-      if (hourPattern.test(allMessages) && dayPattern.test(allMessages)) {
-        matchedSlot = slot;
-        // Don't break — keep looking for later matches (last confirmed wins)
-      }
-    }
+      // Check if this specific hour appears in the confirmation message
+      const hourPattern = new RegExp(`(?:\\b${hour}:00\\b|\\b${hourStr}:00\\b|\\bla\\s+${hour}\\b|\\bora\\s+${hour}\\b)`);
 
-    // Fallback: check if the user confirmed with just the hour (e.g., "14:00 merge")
-    if (!matchedSlot) {
-      const userConfirmPattern = /(\d{1,2}):00/;
-      const userConfirmMatch = allUserMessages.match(userConfirmPattern);
-      if (userConfirmMatch) {
-        const confirmedHour = parseInt(userConfirmMatch[1]);
-        matchedSlot = slots.find(slot => {
-          const roDate = new Date(new Date(slot.iso).toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
-          return roDate.getHours() === confirmedHour;
-        }) || null;
-        if (matchedSlot) {
-          console.log(`[RESCUE] Matched slot by user-confirmed hour: ${confirmedHour}:00`);
+      if (hourPattern.test(confirmationMessage)) {
+        // Additionally verify the day name or date number appears in the same message
+        const dayNum = roDate.getDate();
+        const dayNames = ['duminic', 'luni', 'mar[tț]i', 'miercuri', 'joi', 'vineri', 's[aâ]mb[aă]t'];
+        const dayOfWeek = roDate.getDay();
+        const dayNamePattern = new RegExp(dayNames[dayOfWeek], 'i');
+        const dayNumPattern = new RegExp(`\\b${dayNum}\\b`);
+
+        if (dayNamePattern.test(confirmationMessage) || dayNumPattern.test(confirmationMessage)) {
+          matchedSlot = slot;
+          console.log(`[RESCUE] Matched slot from confirmation: ${slot.display} [${slot.iso}]`);
+          break; // Take the FIRST match from the confirmation message (most specific)
         }
       }
     }
 
+    // Fallback: check user's LAST message with a time pattern (e.g., "14:00 merge")
     if (!matchedSlot) {
-      // Check if the bot confirmed a booking but we can't match the exact slot
-      const bookingConfirmWords = /notat|programat|confirm|te-am programat|apelul.*stabilit/i;
-      if (bookingConfirmWords.test(allBotMessages)) {
-        console.log('[RESCUE] Bot confirmed booking but no exact slot match — checking last offered slot');
-        // Last resort: look for the last ISO timestamp mentioned in bot messages
-        const isoPattern = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}/g;
-        const isoMatches = allBotMessages.match(isoPattern);
-        if (isoMatches) {
-          const lastIso = isoMatches[isoMatches.length - 1];
-          matchedSlot = slots.find(s => s.iso === lastIso) || null;
+      const recentUserMessages = (lead.messages || [])
+        .filter(m => m.role === 'user')
+        .slice(-5);
+
+      for (let i = recentUserMessages.length - 1; i >= 0; i--) {
+        const timeMatch = recentUserMessages[i].content.match(/(\d{1,2}):00/);
+        if (timeMatch) {
+          const confirmedHour = parseInt(timeMatch[1]);
+          matchedSlot = slots.find(slot => {
+            const roDate = new Date(new Date(slot.iso).toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+            return roDate.getHours() === confirmedHour;
+          }) || null;
           if (matchedSlot) {
-            console.log(`[RESCUE] Matched slot by ISO in bot message: ${lastIso}`);
+            console.log(`[RESCUE] Matched slot by user hour ${confirmedHour}:00: ${matchedSlot.display}`);
+            break;
           }
         }
       }
-
-      if (!matchedSlot) {
-        console.log('[RESCUE] No slot match found in conversation');
-        return;
-      }
     }
 
-    console.log(`[RESCUE] Booking: phone=${phone}, email=${email}, slot=${matchedSlot.display} [${matchedSlot.iso}]`);
+    if (!matchedSlot) {
+      console.log('[RESCUE] No slot match found in conversation');
+      return;
+    }
+
+    console.log(`[RESCUE] BOOKING: phone=${phone}, email=${email}, slot=${matchedSlot.display} [${matchedSlot.iso}]`);
 
     const result = await calendarService.bookAppointment({
       leadName: lead.name || 'Unknown',
@@ -414,7 +421,6 @@ Fază Curentă: P1
       console.log(`[RESCUE] SUCCESS! Appointment ID: ${result.appointmentId}`);
       lead.qualification_status = 'booked' as LeadStatus;
 
-      // Log booking activity (awaited for reliability)
       await supabase.from('activities').insert({
         type: 'call_booked',
         lead_id: lead.id,
@@ -425,7 +431,6 @@ Fază Curentă: P1
     } else {
       console.error(`[RESCUE] FAILED: ${result.error}`);
 
-      // Log failure (awaited for reliability)
       await supabase.from('activities').insert({
         type: 'booking_failed',
         lead_id: lead.id,
