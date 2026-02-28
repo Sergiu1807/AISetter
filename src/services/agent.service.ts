@@ -103,6 +103,18 @@ export class AgentService {
         });
       }
 
+      // STEP 8.6: Rescue booking if Claude didn't output Action but phase went to DONE
+      // Claude sometimes skips <meta> tags during short booking exchanges.
+      // This fallback detects phone+email in recent messages and attempts booking.
+      const previousPhase = lead.conversation_phase;
+      const newPhase = parsed.meta.conversation_phase;
+      const bookingNotTriggered = !parsed.meta.action || parsed.meta.action !== 'book_appointment';
+      if (bookingNotTriggered && newPhase === 'DONE' && config.GHL_CALENDAR_ID) {
+        this.rescueBookingIfNeeded(lead).catch(rescueError => {
+          console.error('[AGENT] Rescue booking failed (non-blocking):', rescueError);
+        });
+      }
+
       // STEP 9: Add assistant message to history
       leadService.addMessage(lead, {
         id: generateMessageId(),
@@ -244,9 +256,20 @@ Fază Curentă: P1
 
     // Update qualification status if provided
     if (meta.qualification_status) {
+      // Normalize Romanian → English (Claude sometimes outputs Romanian values)
+      const statusMap: Record<string, string> = {
+        'calificat': 'qualified',
+        'probabil calificat': 'likely_qualified',
+        'necalificat': 'not_fit',
+        'nou': 'new',
+        'explorare': 'exploring',
+        'nurture': 'nurture',
+        'booked': 'booked',
+      };
+      const normalized = statusMap[meta.qualification_status.toLowerCase()] || meta.qualification_status;
       const validStatuses: LeadStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture', 'booked'];
-      if (validStatuses.includes(meta.qualification_status as LeadStatus)) {
-        lead.qualification_status = meta.qualification_status as LeadStatus;
+      if (validStatuses.includes(normalized as LeadStatus)) {
+        lead.qualification_status = normalized as LeadStatus;
       }
     }
 
@@ -263,6 +286,104 @@ Fază Curentă: P1
     if (meta.steps_completed) {
       const steps = meta.steps_completed.split(',').map(s => s.trim()).filter(s => s);
       lead.steps_completed = steps;
+    }
+  }
+
+  /**
+   * Rescue booking when Claude didn't output Action: book_appointment in meta.
+   * Scans recent user messages for phone + email, matches against available slots.
+   */
+  private async rescueBookingIfNeeded(lead: Lead): Promise<void> {
+    // Already booked?
+    if (lead.qualification_status === 'booked') return;
+
+    const recentUserMessages = (lead.messages || [])
+      .filter(m => m.role === 'user')
+      .slice(-5)
+      .map(m => m.content)
+      .join(' ');
+
+    // Extract phone (Romanian format: 07XX XXX XXX or +40...)
+    const phoneMatch = recentUserMessages.match(/(?:\+?40|0)7\d{8}/);
+    // Extract email
+    const emailMatch = recentUserMessages.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+
+    if (!phoneMatch || !emailMatch) {
+      console.log('[RESCUE] No phone/email found in recent messages, skipping');
+      return;
+    }
+
+    const phone = phoneMatch[0];
+    const email = emailMatch[0];
+
+    // Get available slots and find the one most recently discussed
+    const slots = await calendarService.getFormattedSlots();
+    if (slots.length === 0) {
+      console.log('[RESCUE] No available slots, skipping');
+      return;
+    }
+
+    // Look at recent bot messages for confirmed times
+    const recentBotMessages = (lead.messages || [])
+      .filter(m => m.role === 'assistant')
+      .slice(-5)
+      .map(m => m.content)
+      .join(' ');
+
+    // Try to match a slot mentioned in bot messages
+    let matchedSlot = null;
+    for (const slot of slots) {
+      // Check if the bot mentioned this slot's date/time in Romanian format
+      // Extract key parts: day number, hour
+      const slotDate = new Date(slot.iso);
+      const roDate = new Date(slotDate.toLocaleString('en-US', { timeZone: 'Europe/Bucharest' }));
+      const hour = roDate.getHours();
+      const dayNum = roDate.getDate();
+
+      // Look for patterns like "la 13:00" or "la 13" combined with the day number
+      const hourPattern = new RegExp(`\\b${hour}(?::00)?\\b`);
+      const dayPattern = new RegExp(`\\b${dayNum}\\b`);
+
+      if (hourPattern.test(recentBotMessages) && dayPattern.test(recentBotMessages)) {
+        matchedSlot = slot;
+        break;
+      }
+    }
+
+    if (!matchedSlot) {
+      // Fallback: use the first available slot if bot confirmed a booking generally
+      const bookingConfirmWords = /notat|calendar|sun.*la|programat|confirm/i;
+      if (bookingConfirmWords.test(recentBotMessages)) {
+        console.log('[RESCUE] Bot confirmed booking but no exact slot match — skipping auto-book to avoid wrong slot');
+      } else {
+        console.log('[RESCUE] No slot match found in conversation');
+      }
+      return;
+    }
+
+    console.log(`[RESCUE] Found booking data: phone=${phone}, email=${email}, slot=${matchedSlot.display}`);
+
+    const result = await calendarService.bookAppointment({
+      leadName: lead.name || 'Unknown',
+      phone,
+      email,
+      selectedSlot: matchedSlot.iso,
+    });
+
+    if (result.success) {
+      console.log(`[RESCUE] Booking rescued! Appointment ID: ${result.appointmentId}`);
+      lead.qualification_status = 'booked' as LeadStatus;
+      await leadService.update(lead.id, lead);
+
+      supabase.from('activities').insert({
+        type: 'call_booked',
+        lead_id: lead.id,
+        title: `Call booked (rescued): ${lead.name}`,
+        description: `Slot: ${matchedSlot.display}, Phone: ${phone}, Email: ${email}`,
+        metadata: { appointment_id: result.appointmentId, rescued: true }
+      }).then(() => {}).catch(() => {});
+    } else {
+      console.error(`[RESCUE] Booking failed: ${result.error}`);
     }
   }
 
