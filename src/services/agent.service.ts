@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { leadService } from './lead.service';
 import { promptService } from './prompt.service';
 import { parserService } from './parser.service';
+import { calendarService } from './calendar.service';
 import { splitIntoMessageChunks, generateMessageId, getHoursDiff, detectFirstName, sleep } from '@/utils/format';
 import type { ProcessMessageInput, ResponseMeta } from '@/types/agent.types';
 import type { Lead, LeadPhase, LeadStatus } from '@/types/lead.types';
@@ -60,9 +61,23 @@ export class AgentService {
         timestamp: new Date().toISOString()
       });
 
-      // STEP 5: Build prompt with dynamic context
+      // STEP 5: Fetch calendar slots if lead is in booking phase (P4/P5)
+      let availableSlots = '';
+      const isBookingPhase = ['P4', 'P5'].includes(lead.conversation_phase || '');
+      if (isBookingPhase && config.GHL_CALENDAR_ID) {
+        try {
+          const slots = await calendarService.getFormattedSlots();
+          availableSlots = calendarService.formatSlotsForPrompt(slots);
+          console.log(`[AGENT] Fetched ${slots.length} calendar slots for booking phase`);
+        } catch (calendarError) {
+          console.error('[AGENT] Calendar fetch failed, using fallback:', calendarError);
+          // Graceful fallback — bot will use CALENDAR_LINK instead
+        }
+      }
+
+      // STEP 5.5: Build prompt with dynamic context
       console.log(`[AGENT] Building prompt for lead ${lead.id.substring(0, 8)}...`);
-      const { staticPrompt, dynamicContext } = await promptService.buildPrompt(lead);
+      const { staticPrompt, dynamicContext } = await promptService.buildPrompt(lead, { availableSlots });
       console.log(`[AGENT] Prompt built (${staticPrompt.length} chars static, ${dynamicContext.length} chars dynamic)`);
 
       // STEP 6: Call Claude API with caching and retry logic
@@ -80,6 +95,13 @@ export class AgentService {
 
       // STEP 8: Update lead from parsed meta
       this.updateLeadFromMeta(lead, parsed.meta);
+
+      // STEP 8.5: Handle booking action (fire-and-forget, non-blocking)
+      if (parsed.meta.action === 'book_appointment' && parsed.meta.selected_slot) {
+        this.handleBooking(lead, parsed.meta).catch(bookingError => {
+          console.error('[AGENT] Booking failed (non-blocking):', bookingError);
+        });
+      }
 
       // STEP 9: Add assistant message to history
       leadService.addMessage(lead, {
@@ -222,7 +244,7 @@ Fază Curentă: P1
 
     // Update qualification status if provided
     if (meta.qualification_status) {
-      const validStatuses: LeadStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture'];
+      const validStatuses: LeadStatus[] = ['new', 'exploring', 'likely_qualified', 'qualified', 'not_fit', 'nurture', 'booked'];
       if (validStatuses.includes(meta.qualification_status as LeadStatus)) {
         lead.qualification_status = meta.qualification_status as LeadStatus;
       }
@@ -241,6 +263,62 @@ Fază Curentă: P1
     if (meta.steps_completed) {
       const steps = meta.steps_completed.split(',').map(s => s.trim()).filter(s => s);
       lead.steps_completed = steps;
+    }
+  }
+
+  private async handleBooking(lead: Lead, meta: ResponseMeta): Promise<void> {
+    const { selected_slot, contact_phone, contact_email } = meta;
+
+    if (!selected_slot || !contact_phone || !contact_email) {
+      console.warn('[BOOKING] Missing data for booking:', {
+        has_slot: !!selected_slot,
+        has_phone: !!contact_phone,
+        has_email: !!contact_email
+      });
+      return;
+    }
+
+    console.log(`[BOOKING] Attempting to book slot ${selected_slot} for lead ${lead.id.substring(0, 8)}...`);
+
+    const result = await calendarService.bookAppointment({
+      leadName: lead.name || 'Unknown',
+      phone: contact_phone,
+      email: contact_email,
+      selectedSlot: selected_slot,
+    });
+
+    if (result.success) {
+      console.log(`[BOOKING] Success! Appointment ID: ${result.appointmentId}`);
+
+      // Update lead status to booked
+      lead.qualification_status = 'booked' as LeadStatus;
+      lead.conversation_phase = 'DONE' as LeadPhase;
+      await leadService.update(lead.id, lead);
+
+      // Log booking activity (fire-and-forget)
+      supabase.from('activities').insert({
+        type: 'call_booked',
+        lead_id: lead.id,
+        title: `Call booked: ${lead.name}`,
+        description: `Slot: ${selected_slot}, Phone: ${contact_phone}, Email: ${contact_email}`,
+        metadata: {
+          appointment_id: result.appointmentId,
+          selected_slot,
+          contact_phone,
+          contact_email
+        }
+      }).then(() => {}).catch(() => {});
+    } else {
+      console.error(`[BOOKING] Failed: ${result.error}`);
+
+      // Log failed booking attempt
+      supabase.from('activities').insert({
+        type: 'booking_failed',
+        lead_id: lead.id,
+        title: `Booking failed: ${lead.name}`,
+        description: `Error: ${result.error}`,
+        metadata: { selected_slot, error: result.error }
+      }).then(() => {}).catch(() => {});
     }
   }
 
