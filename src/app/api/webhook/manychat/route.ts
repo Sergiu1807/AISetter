@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { waitUntil } from '@vercel/functions';
 import { agentService } from '@/services/agent.service';
 import { config } from '@/lib/config';
+import { supabase } from '@/lib/supabase';
 import type { ManyChatWebhookPayload } from '@/types/manychat.types';
 
 // Verify ManyChat webhook signature
@@ -93,7 +94,19 @@ export async function POST(request: NextRequest) {
     const igUsername = payload.ig_username;
 
     // 6. Log incoming webhook (sanitized - only show first 8 chars of ID)
-    console.log(`[WEBHOOK] Received message from subscriber ${manychatUserId.substring(0, 8)}...`);
+    console.log(`[WEBHOOK] Received message from subscriber ${manychatUserId.substring(0, 8)}... msg="${userMessage.substring(0, 40)}"`);
+
+    // 6.5 Log webhook to DB for diagnostics (fire-and-forget, non-blocking)
+    supabase.from('activities').insert({
+      type: 'webhook_received',
+      title: `Webhook from ${manychatUserId.substring(0, 8)}...`,
+      description: `Message: "${userMessage.substring(0, 100)}"`,
+      metadata: {
+        subscriber_id: manychatUserId,
+        message_length: userMessage.length,
+        timestamp: new Date().toISOString()
+      }
+    }).then(() => {}).catch(() => {});
 
     // 7. Process in background — return 200 immediately so ManyChat doesn't timeout
     // ManyChat has a ~10s webhook timeout. Claude API takes 15-30s.

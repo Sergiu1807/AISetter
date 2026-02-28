@@ -370,24 +370,24 @@ Fază Curentă: P1
     // Split into chunks (randomized 1-4 messages for human-like variation)
     const chunks = splitIntoMessageChunks(response, 6);
 
-    // Only send non-empty fields — ManyChat rejects empty/whitespace values with 422
+    // ALWAYS set ALL 6 fields to prevent stale values from previous responses.
+    // ManyChat rejects empty strings/whitespace with 422, so unused fields get "-".
+    // The ManyChat response flow must check: if field != "-" then send message.
     const fields: ManyChatCustomField[] = [];
+    let activeChunks = 0;
     for (let i = 1; i <= 6; i++) {
       const chunk = chunks[i - 1];
-      if (chunk && chunk.trim()) {
-        fields.push({
-          field_name: `AI > Answer ${i}`,
-          field_value: chunk
-        });
-      }
+      const hasContent = chunk && chunk.trim();
+      fields.push({
+        field_name: `AI > Answer ${i}`,
+        field_value: hasContent ? chunk : '-'
+      });
+      if (hasContent) activeChunks++;
     }
 
-    console.log(`[MANYCHAT] Setting ${fields.length} chunks for subscriber ${subscriberId.substring(0, 8)}...`);
+    console.log(`[MANYCHAT] Setting ${activeChunks} chunks (6 fields total) for subscriber ${subscriberId.substring(0, 8)}...`);
 
-    // Set custom fields (only if we have any)
-    if (fields.length > 0) {
-      await manychatClient.setCustomFields(subscriberId, fields);
-    }
+    await manychatClient.setCustomFields(subscriberId, fields);
 
     // Trigger response flow to deliver AI answers to the subscriber
     await manychatClient.sendFlow(subscriberId, config.MANYCHAT_RESPONSE_FLOW_ID);
