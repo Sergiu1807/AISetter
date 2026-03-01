@@ -26,17 +26,6 @@ export async function middleware(request: NextRequest) {
   // Get client IP
   const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
 
-  // Rate limit webhook endpoint
-  if (request.nextUrl.pathname === '/api/webhook/manychat') {
-    if (!rateLimit(ip, 60, 60000)) {
-      console.log(`[RATE LIMIT] Blocked ${ip}`)
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429 }
-      )
-    }
-  }
-
   // Update Supabase session (handles auth)
   const response = await updateSession(request)
 
