@@ -28,7 +28,11 @@ const navigation = [
   { name: 'Admin', href: '/dashboard/admin', icon: Shield, adminOnly: true },
 ]
 
-export function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void
+}
+
+export function Sidebar({ onNavigate }: SidebarProps = {}) {
   const pathname = usePathname()
   const { role } = useAuth()
 
@@ -61,6 +65,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive

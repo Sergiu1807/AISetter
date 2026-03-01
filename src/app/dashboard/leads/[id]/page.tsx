@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import type { Lead } from '@/types/lead.types'
 import type { Conversation } from '@/types/conversation.types'
 import {
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   GraduationCap,
   Pause,
+  PanelLeftOpen,
 } from 'lucide-react'
 
 export default function LeadDetailPage() {
@@ -263,25 +265,45 @@ export default function LeadDetailPage() {
 
   return (
     <div className="flex h-screen">
-      {/* Lead Info Sidebar */}
-      <LeadInfoSidebar
-        lead={lead}
-        onPauseBot={handlePauseBot}
-        onResumeBot={handleResumeBot}
-        onAssign={handleAssign}
-        onAddTags={handleAddTags}
-      />
+      {/* Lead Info Sidebar — hidden on mobile, shown as Sheet */}
+      <div className="hidden lg:block">
+        <LeadInfoSidebar
+          lead={lead}
+          onPauseBot={handlePauseBot}
+          onResumeBot={handleResumeBot}
+          onAssign={handleAssign}
+          onAddTags={handleAddTags}
+        />
+      </div>
 
       {/* Main Conversation Area */}
       <div className="flex-1 flex flex-col bg-white dark:bg-gray-950">
         {/* Header */}
-        <div className="border-b border-gray-200 dark:border-gray-800 px-6 py-4">
+        <div className="border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              {/* Mobile: Lead info Sheet toggle */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm" className="lg:hidden">
+                    <PanelLeftOpen className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-80">
+                  <LeadInfoSidebar
+                    lead={lead}
+                    onPauseBot={handlePauseBot}
+                    onResumeBot={handleResumeBot}
+                    onAssign={handleAssign}
+                    onAddTags={handleAddTags}
+                  />
+                </SheetContent>
+              </Sheet>
+
               <Link href="/dashboard/leads">
                 <Button variant="ghost" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Leads
+                  <span className="hidden sm:inline">Back to Leads</span>
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-700" />
@@ -359,10 +381,10 @@ export default function LeadDetailPage() {
         {/* Conversation Thread */}
         <ConversationThread conversation={conversation} />
 
-        {/* Message Input (only show if human has taken over) */}
+        {/* Message Input (only when human has taken over) */}
         {humanActive && (
-          <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900">
-            <Card className="p-4">
+          <div className="border-t border-gray-200 dark:border-gray-800 p-3 md:p-4 bg-gray-50 dark:bg-gray-900">
+            <Card className="p-3 md:p-4">
               <div className="flex items-end gap-3">
                 <div className="flex-1">
                   <Textarea

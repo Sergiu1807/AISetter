@@ -154,8 +154,8 @@ export class AgentService {
       // STEP 10: Save to database (JSONB)
       await leadService.update(lead.id, lead);
 
-      // STEP 10.5: ALSO save to normalized messages table (fire-and-forget, non-critical)
-      this.saveMessagesToNormalizedTable(lead.id, input.message, parsed.response, parsed.analysis, parsed.meta).catch(() => {});
+      // STEP 10.5: Save to normalized messages table (awaited to ensure correct ordering for realtime)
+      await this.saveMessagesToNormalizedTable(lead.id, input.message, parsed.response, parsed.analysis, parsed.meta);
 
       // STEP 10.6: Track prompt version performance (fire-and-forget)
       this.trackPromptPerformance(lead, parsed.meta).catch(() => {});

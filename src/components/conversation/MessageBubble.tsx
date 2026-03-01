@@ -1,5 +1,5 @@
 import { Message, SENDER_COLORS } from '@/types/conversation.types'
-import { Bot, User, UserCircle, ArrowRight } from 'lucide-react'
+import { Bot, User, UserCircle, ArrowRight, Camera, Mic, Video } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 interface MessageBubbleProps {
@@ -83,6 +83,25 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             isLead ? 'rounded-tr-sm' : 'rounded-tl-sm'
           }`}
         >
+          {/* Media type indicator */}
+          {message.content.startsWith('[Imagine trimisă:') && (
+            <div className="flex items-center gap-1.5 mb-1.5 text-xs text-purple-600 dark:text-purple-400">
+              <Camera className="h-3.5 w-3.5" />
+              <span className="font-medium">Image</span>
+            </div>
+          )}
+          {message.content.startsWith('[Mesaj vocal:') && (
+            <div className="flex items-center gap-1.5 mb-1.5 text-xs text-orange-600 dark:text-orange-400">
+              <Mic className="h-3.5 w-3.5" />
+              <span className="font-medium">Voice Note</span>
+            </div>
+          )}
+          {message.content.startsWith('[Video trimis:') && (
+            <div className="flex items-center gap-1.5 mb-1.5 text-xs text-pink-600 dark:text-pink-400">
+              <Video className="h-3.5 w-3.5" />
+              <span className="font-medium">Video</span>
+            </div>
+          )}
           <p className={`text-sm ${colors.text} whitespace-pre-wrap`}>
             {message.content}
           </p>
