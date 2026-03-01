@@ -26,20 +26,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   // Check if this is a phase transition message
   const isPhaseTransition = message.metadata?.phase_transition
 
-  // Render phase transition marker
+  // Render phase transition marker (compact)
   if (isPhaseTransition) {
     return (
-      <div className="flex items-center justify-center my-6">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 dark:bg-purple-900 border border-purple-200 dark:border-purple-800">
-          <Badge variant="outline" className="text-xs">
+      <div className="flex items-center justify-center my-2">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
             {message.metadata?.phase_transition?.from}
-          </Badge>
-          <ArrowRight className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-          <Badge variant="outline" className="text-xs">
+          </span>
+          <ArrowRight className="h-2.5 w-2.5 text-purple-400" />
+          <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">
             {message.metadata?.phase_transition?.to}
-          </Badge>
-          <span className="text-xs text-purple-700 dark:text-purple-300 ml-2">
-            Phase Transition
           </span>
         </div>
       </div>
@@ -129,9 +126,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         {/* Phase badge if present */}
         {message.metadata?.phase && !isPhaseTransition && (
-          <Badge variant="outline" className="text-xs mt-1">
-            Phase {message.metadata.phase}
-          </Badge>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 px-1">
+            {message.metadata.phase}
+          </span>
         )}
       </div>
     </div>

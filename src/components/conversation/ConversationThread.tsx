@@ -32,11 +32,14 @@ function formatDateSeparator(date: Date): string {
 export function ConversationThread({ conversation }: ConversationThreadProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Sort messages chronologically (backend may return out of order due to async saves)
+  // Sort messages chronologically. When timestamps are equal, user messages come before bot responses.
+  const senderOrder: Record<string, number> = { lead: 0, human: 1, bot: 2 }
   const sortedMessages = useMemo(() =>
-    [...conversation.messages].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    ),
+    [...conversation.messages].sort((a, b) => {
+      const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return (senderOrder[a.sender_type] ?? 1) - (senderOrder[b.sender_type] ?? 1)
+    }),
     [conversation.messages]
   )
 

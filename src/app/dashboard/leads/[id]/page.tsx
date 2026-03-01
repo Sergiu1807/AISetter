@@ -290,7 +290,7 @@ export default function LeadDetailPage() {
                     <PanelLeftOpen className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-80">
+                <SheetContent side="left" className="p-0 w-72">
                   <LeadInfoSidebar
                     lead={lead}
                     onPauseBot={handlePauseBot}
@@ -424,13 +424,10 @@ export default function LeadDetailPage() {
 
         {/* Bot Active Notice */}
         {botActive && (
-          <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-blue-50 dark:bg-blue-950">
-            <div className="flex items-center justify-center gap-2 text-sm text-blue-800 dark:text-blue-200">
-              <Bot className="h-4 w-4" />
-              <span>
-                Bot is currently handling this conversation. Click &quot;Take Over&quot; to
-                send manual messages.
-              </span>
+          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-800 px-3 md:px-4 py-3 bg-blue-50 dark:bg-blue-950">
+            <div className="flex items-center justify-center gap-2 text-xs md:text-sm text-blue-800 dark:text-blue-200 text-center">
+              <Bot className="h-4 w-4 flex-shrink-0" />
+              <span>Bot is handling this conversation. Click &quot;Take Over&quot; to reply manually.</span>
             </div>
           </div>
         )}

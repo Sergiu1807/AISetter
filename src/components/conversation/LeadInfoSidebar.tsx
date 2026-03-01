@@ -47,7 +47,7 @@ export function LeadInfoSidebar({
   }
 
   return (
-    <div className="w-80 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-6 overflow-y-auto">
+    <div className="w-72 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 overflow-y-auto">
       {/* Lead Avatar & Name */}
       <div className="flex flex-col items-center mb-6">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-3">
