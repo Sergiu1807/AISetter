@@ -23,11 +23,13 @@ import {
 } from 'lucide-react'
 import type { Lead, LeadStatus, LeadPhase } from '@/types/lead.types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types/lead.types'
+import { KPIDashboard } from '@/components/dashboard/KPIDashboard'
 
 export default function AnalyticsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState('7days')
+  const [activeView, setActiveView] = useState<'overview' | 'kpi'>('overview')
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -140,7 +142,7 @@ export default function AnalyticsPage() {
   return (
     <div className="flex-1 space-y-6 p-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Analytics & Reports
@@ -150,23 +152,50 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="7days">Last 7 Days</SelectItem>
-              <SelectItem value="30days">Last 30 Days</SelectItem>
-              <SelectItem value="90days">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* View Toggle */}
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <Button
+              variant={activeView === 'overview' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setActiveView('overview')}
+            >
+              Overview
+            </Button>
+            <Button
+              variant={activeView === 'kpi' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setActiveView('kpi')}
+            >
+              KPI Dashboard
+            </Button>
+          </div>
+          {activeView === 'overview' && (
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="7days">Last 7 Days</SelectItem>
+                <SelectItem value="30days">Last 30 Days</SelectItem>
+                <SelectItem value="90days">Last 90 Days</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <Button variant="outline" onClick={() => alert('Export functionality coming soon!')}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
         </div>
       </div>
+
+      {/* KPI Dashboard View */}
+      {activeView === 'kpi' && <KPIDashboard />}
+
+      {/* Overview View */}
+      {activeView === 'overview' && <>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -496,6 +525,8 @@ export default function AnalyticsPage() {
           </div>
         </CardContent>
       </Card>
+
+      </>}
     </div>
   )
 }

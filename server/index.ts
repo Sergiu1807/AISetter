@@ -14,6 +14,7 @@ import trainingRoutes from './routes/training';
 import knowledgeBaseRoutes from './routes/knowledge-base';
 import promptRoutes from './routes/prompt';
 import usersRoutes from './routes/users';
+import analyticsRoutes from './routes/analytics';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -44,6 +45,7 @@ app.use(trainingRoutes);
 app.use(knowledgeBaseRoutes);
 app.use(promptRoutes);
 app.use(usersRoutes);
+app.use(analyticsRoutes);
 
 // 404 handler
 app.use((_req, res) => {
