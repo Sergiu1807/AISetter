@@ -76,7 +76,7 @@ export default function LeadDetailPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     )
@@ -85,7 +85,7 @@ export default function LeadDetailPage() {
   // Error state
   if (error || !lead) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen">
+      <div className="flex flex-col items-center justify-center h-full">
         <AlertCircle className="h-16 w-16 text-gray-400 mb-4" />
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
           {error ? 'Error Loading Lead' : 'Lead Not Found'}
@@ -104,7 +104,7 @@ export default function LeadDetailPage() {
   // Handle no conversation
   if (!conversation) {
     return (
-      <div className="flex h-screen">
+      <div className="flex h-full overflow-hidden">
         <LeadInfoSidebar
           lead={lead}
           onPauseBot={() => alert('Pause bot clicked')}
@@ -264,7 +264,7 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full overflow-hidden">
       {/* Lead Info Sidebar — hidden on mobile, shown as Sheet */}
       <div className="hidden lg:block">
         <LeadInfoSidebar
@@ -277,15 +277,16 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Main Conversation Area */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-gray-950">
+      <div className="flex-1 flex flex-col bg-white dark:bg-gray-950 min-w-0">
         {/* Header */}
         <div className="border-b border-gray-200 dark:border-gray-800 px-3 md:px-6 py-3 md:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            {/* Left: navigation */}
+            <div className="flex items-center gap-2 min-w-0">
               {/* Mobile: Lead info Sheet toggle */}
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="lg:hidden">
+                  <Button variant="ghost" size="sm" className="lg:hidden flex-shrink-0">
                     <PanelLeftOpen className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
@@ -301,56 +302,53 @@ export default function LeadDetailPage() {
               </Sheet>
 
               <Link href="/dashboard/leads">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Back to Leads</span>
+                <Button variant="ghost" size="sm" className="flex-shrink-0">
+                  <ArrowLeft className="h-4 w-4 mr-1 md:mr-2" />
+                  <span className="hidden sm:inline">Back</span>
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-700" />
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Conversation with {lead.name}
+              <h1 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                {lead.name}
               </h1>
             </div>
 
-            {/* Bot Status */}
-            <div className="flex items-center gap-3">
+            {/* Right: status + actions */}
+            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
               {botActive && (
                 <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
                   <Bot className="h-3 w-3 mr-1" />
-                  Bot Active
+                  <span className="hidden sm:inline">Bot Active</span>
+                  <span className="sm:hidden">Bot</span>
                 </Badge>
               )}
               {humanActive && (
                 <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border border-green-200 dark:border-green-800">
                   <UserCircle className="h-3 w-3 mr-1" />
-                  Human Control
-                  {conversation.taken_over_by_name &&
-                    ` - ${conversation.taken_over_by_name}`}
+                  <span className="hidden sm:inline">Human Control</span>
+                  <span className="sm:hidden">Human</span>
                 </Badge>
               )}
 
-              {/* Training Button */}
-              <Link href={`/dashboard/training/submit?leadId=${leadId}`}>
+              {/* Training Button — hidden on small screens */}
+              <Link href={`/dashboard/training/submit?leadId=${leadId}`} className="hidden md:block">
                 <Button size="sm" variant="outline">
                   <GraduationCap className="h-4 w-4 mr-2" />
-                  Submit as Training
+                  Training
                 </Button>
               </Link>
 
               {/* Take Over / Return Button */}
               {botActive ? (
                 <Button onClick={handleTakeOver} size="sm" variant="outline">
-                  <UserCircle className="h-4 w-4 mr-2" />
-                  Take Over
+                  <UserCircle className="h-4 w-4 mr-1 md:mr-2" />
+                  <span className="hidden sm:inline">Take Over</span>
+                  <span className="sm:hidden">Take</span>
                 </Button>
               ) : (
-                <Button
-                  onClick={handleReturnToBot}
-                  size="sm"
-                  variant="outline"
-                >
-                  <Bot className="h-4 w-4 mr-2" />
-                  Return to Bot
+                <Button onClick={handleReturnToBot} size="sm" variant="outline">
+                  <Bot className="h-4 w-4 mr-1 md:mr-2" />
+                  <span className="hidden sm:inline">Return to Bot</span>
+                  <span className="sm:hidden">Bot</span>
                 </Button>
               )}
             </div>
@@ -359,22 +357,20 @@ export default function LeadDetailPage() {
 
         {/* Escalation Banners */}
         {lead.needs_human && !humanActive && (
-          <div className="bg-red-50 dark:bg-red-950 border-b border-red-200 dark:border-red-800 px-6 py-3 flex items-center justify-between">
+          <div className="bg-red-50 dark:bg-red-950 border-b border-red-200 dark:border-red-800 px-3 md:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Escalation Alert</span>
-              <span className="text-sm">— This lead needs human attention</span>
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="font-medium text-sm">Escalation — needs human attention</span>
             </div>
             <Button size="sm" variant="destructive" onClick={handleTakeOver}>
-              Take Over Now
+              Take Over
             </Button>
           </div>
         )}
         {lead.bot_paused && !humanActive && !lead.needs_human && (
-          <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-6 py-3 flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
-            <Pause className="h-5 w-5" />
-            <span className="font-medium">Bot Paused</span>
-            <span className="text-sm">— The bot stopped responding. Take over to reply manually.</span>
+          <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-3 md:px-6 py-3 flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+            <Pause className="h-5 w-5 flex-shrink-0" />
+            <span className="font-medium text-sm">Bot Paused — take over to reply manually</span>
           </div>
         )}
 
