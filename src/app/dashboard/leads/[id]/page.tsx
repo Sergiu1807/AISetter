@@ -104,7 +104,7 @@ export default function LeadDetailPage() {
   // Handle no conversation
   if (!conversation) {
     return (
-      <div className="flex h-full overflow-hidden">
+      <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
         <LeadInfoSidebar
           lead={lead}
           onPauseBot={() => alert('Pause bot clicked')}
@@ -264,9 +264,9 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Lead Info Sidebar — hidden on mobile, shown as Sheet */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block flex-shrink-0">
         <LeadInfoSidebar
           lead={lead}
           onPauseBot={handlePauseBot}
