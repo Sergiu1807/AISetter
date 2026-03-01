@@ -10,9 +10,12 @@ export const config = {
   // Anthropic
   ANTHROPIC_API_KEY: getEnvVar('ANTHROPIC_API_KEY'),
 
-  // Supabase
-  SUPABASE_URL: getEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
+  // Supabase (support both NEXT_PUBLIC_ prefix for Vercel and plain for Railway)
+  SUPABASE_URL: process.env.SUPABASE_URL || getEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
   SUPABASE_SERVICE_ROLE_KEY: getEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
+
+  // Railway API URL (for Vercel proxy)
+  RAILWAY_API_URL: getEnvVar('RAILWAY_API_URL', false),
 
   // ManyChat
   MANYCHAT_API_KEY: getEnvVar('MANYCHAT_API_KEY'),
