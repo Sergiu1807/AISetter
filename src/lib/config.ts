@@ -28,6 +28,9 @@ export const config = {
   // OpenAI (for media processing: image vision, voice transcription)
   OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY', false),
 
+  // Google Gemini (for media processing: images, voice notes, video)
+  GEMINI_API_KEY: getEnvVar('GEMINI_API_KEY', false),
+
   // Telegram (for escalation notifications)
   TELEGRAM_BOT_TOKEN: getEnvVar('TELEGRAM_BOT_TOKEN', false),
   TELEGRAM_CHAT_ID: getEnvVar('TELEGRAM_CHAT_ID', false),

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Clock, ArrowRight, CheckCircle2, AlertCircle, UserPlus } from 'lucide-react'
+import { Clock, ArrowRight, CheckCircle2, AlertCircle, UserPlus, ShieldAlert } from 'lucide-react'
+import { useRealtimeActivities } from '@/hooks/useRealtime'
 import Link from 'next/link'
 
 interface Activity {
@@ -31,24 +32,31 @@ export function RecentActivity() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const res = await fetch('/api/activities?limit=5')
-        if (res.ok) {
-          const data = await res.json()
-          setActivities(data.activities || [])
-        }
-      } catch (error) {
-        console.error('Error fetching activities:', error)
-      } finally {
-        setLoading(false)
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await fetch('/api/activities?limit=5')
+      if (res.ok) {
+        const data = await res.json()
+        setActivities(data.activities || [])
       }
+    } catch (error) {
+      console.error('Error fetching activities:', error)
+    } finally {
+      setLoading(false)
     }
-    fetchActivities()
   }, [])
 
+  useEffect(() => {
+    fetchActivities()
+  }, [fetchActivities])
+
+  // Real-time: re-fetch when new activities are inserted
+  useRealtimeActivities(fetchActivities)
+
   const getStatusColor = (type: string) => {
+    if (type === 'escalation') {
+      return 'text-red-600 dark:text-red-400'
+    }
     if (type.includes('booked') || type === 'call_booked') {
       return 'text-green-600 dark:text-green-400'
     }
@@ -62,6 +70,9 @@ export function RecentActivity() {
   }
 
   const getIcon = (type: string) => {
+    if (type === 'escalation') {
+      return <ShieldAlert className="h-4 w-4" />
+    }
     if (type.includes('booked') || type === 'call_booked') {
       return <CheckCircle2 className="h-4 w-4" />
     }

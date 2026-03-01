@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,9 @@ import {
   Info,
   CheckCircle,
   Eye,
+  ShieldAlert,
 } from 'lucide-react'
+import { useRealtimeActivities } from '@/hooks/useRealtime'
 
 interface Activity {
   id: string
@@ -30,22 +32,26 @@ export default function AlertsPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const res = await fetch('/api/activities?limit=50')
-        if (res.ok) {
-          const data = await res.json()
-          setActivities(data.activities || [])
-        }
-      } catch (error) {
-        console.error('Error fetching activities:', error)
-      } finally {
-        setLoading(false)
+  const fetchActivities = useCallback(async () => {
+    try {
+      const res = await fetch('/api/activities?limit=50')
+      if (res.ok) {
+        const data = await res.json()
+        setActivities(data.activities || [])
       }
+    } catch (error) {
+      console.error('Error fetching activities:', error)
+    } finally {
+      setLoading(false)
     }
-    fetchActivities()
   }, [])
+
+  useEffect(() => {
+    fetchActivities()
+  }, [fetchActivities])
+
+  // Real-time: re-fetch when new activities are inserted
+  useRealtimeActivities(fetchActivities)
 
   // Count unread (activities from last 24 hours)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
@@ -57,6 +63,14 @@ export default function AlertsPage() {
   const getAlertConfig = (
     type: string
   ): { icon: React.ElementType; color: string; bgColor: string; borderColor: string } => {
+    if (type === 'escalation') {
+      return {
+        icon: ShieldAlert,
+        color: 'text-red-700 dark:text-red-300',
+        bgColor: 'bg-red-50 dark:bg-red-950',
+        borderColor: 'border-red-200 dark:border-red-800',
+      }
+    }
     if (type.includes('error')) {
       return {
         icon: AlertCircle,

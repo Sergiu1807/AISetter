@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertCircle, Eye, UserPlus, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import type { Lead } from '@/types/lead.types'
+import { useRealtimeLeads } from '@/hooks/useRealtime'
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString)
@@ -28,23 +29,26 @@ export function NeedsAttentionList() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const res = await fetch('/api/leads?needs_human=true')
-        if (res.ok) {
-          const data = await res.json()
-          // Get first 3 leads that need attention
-          setLeads((data.leads || []).slice(0, 3))
-        }
-      } catch (error) {
-        console.error('Error fetching leads:', error)
-      } finally {
-        setLoading(false)
+  const fetchLeads = useCallback(async () => {
+    try {
+      const res = await fetch('/api/leads?needs_human=true')
+      if (res.ok) {
+        const data = await res.json()
+        setLeads((data.leads || []).slice(0, 3))
       }
+    } catch (error) {
+      console.error('Error fetching leads:', error)
+    } finally {
+      setLoading(false)
     }
-    fetchLeads()
   }, [])
+
+  useEffect(() => {
+    fetchLeads()
+  }, [fetchLeads])
+
+  // Real-time: re-fetch when any lead changes (needs_human flag set by backend)
+  useRealtimeLeads(fetchLeads)
 
   const getPriority = (lead: Lead): 'high' | 'medium' | 'low' => {
     if (lead.has_errors) return 'high'

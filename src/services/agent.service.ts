@@ -7,6 +7,8 @@ import { leadService } from './lead.service';
 import { promptService } from './prompt.service';
 import { parserService } from './parser.service';
 import { calendarService } from './calendar.service';
+import { processMedia } from './media.service';
+import { notifyEscalation } from './notification.service';
 import { splitIntoMessageChunks, generateMessageId, getHoursDiff, detectFirstName, sleep } from '@/utils/format';
 import type { ProcessMessageInput, ResponseMeta } from '@/types/agent.types';
 import type { Lead, LeadPhase, LeadStatus } from '@/types/lead.types';
@@ -53,11 +55,25 @@ export class AgentService {
         }
       }
 
+      // STEP 3.5: Process media attachment if present
+      let messageContent = input.message;
+      if (input.mediaUrl && input.mediaType) {
+        const mediaText = await processMedia(input.mediaUrl, input.mediaType);
+        if (mediaText) {
+          // If the message text IS the media URL, replace it entirely
+          const textIsUrl = messageContent.trim().startsWith('http') && !messageContent.includes(' ');
+          messageContent = textIsUrl
+            ? mediaText
+            : `${mediaText}\n\n${messageContent}`;
+          console.log(`[AGENT] Media processed: ${mediaText.substring(0, 60)}...`);
+        }
+      }
+
       // STEP 4: Add user message to history
       leadService.addMessage(lead, {
         id: generateMessageId(),
         role: 'user',
-        content: input.message,
+        content: messageContent,
         timestamp: new Date().toISOString()
       });
 
@@ -294,6 +310,19 @@ Fază Curentă: P1
     if (meta.steps_completed) {
       const steps = meta.steps_completed.split(',').map(s => s.trim()).filter(s => s);
       lead.steps_completed = steps;
+    }
+
+    // Handle escalation (medium → flag for dashboard, high → pause bot)
+    if (meta.escalation === 'medium' || meta.escalation === 'high') {
+      lead.needs_human = true;
+
+      if (meta.escalation === 'high') {
+        lead.bot_paused = true;
+      }
+
+      // Notify in-app + Telegram (fire-and-forget — don't block response)
+      notifyEscalation(lead, meta.escalation, meta.escalation_reason || 'No reason provided')
+        .catch(err => console.error('[ESCALATION] Notification error:', err));
     }
   }
 
@@ -620,7 +649,7 @@ Fază Curentă: P1
   }
 
   private async sendToManyChat(subscriberId: string, response: string): Promise<void> {
-    // Split into chunks (randomized 1-4 messages for human-like variation)
+    // Split into chunks (randomized 1-6 messages for human-like variation)
     const chunks = splitIntoMessageChunks(response, 6);
 
     // Only send non-empty fields — ManyChat rejects empty/whitespace values with 422.

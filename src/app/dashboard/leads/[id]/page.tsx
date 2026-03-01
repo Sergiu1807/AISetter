@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useRealtimeMessages } from '@/hooks/useRealtime'
+import { useRealtimeMessages, useRealtimeLeads, useRealtimeConversations } from '@/hooks/useRealtime'
 import { LeadInfoSidebar } from '@/components/conversation/LeadInfoSidebar'
 import { ConversationThread } from '@/components/conversation/ConversationThread'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import {
   UserCircle,
   AlertCircle,
   GraduationCap,
+  Pause,
 } from 'lucide-react'
 
 export default function LeadDetailPage() {
@@ -65,8 +66,10 @@ export default function LeadDetailPage() {
     fetchData()
   }, [fetchData])
 
-  // Subscribe to real-time messages
+  // Subscribe to real-time updates
   useRealtimeMessages(conversation?.id, fetchData)
+  useRealtimeLeads(fetchData)
+  useRealtimeConversations(fetchData)
 
   // Loading state
   if (loading) {
@@ -331,6 +334,27 @@ export default function LeadDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Escalation Banners */}
+        {lead.needs_human && !humanActive && (
+          <div className="bg-red-50 dark:bg-red-950 border-b border-red-200 dark:border-red-800 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">Escalation Alert</span>
+              <span className="text-sm">— This lead needs human attention</span>
+            </div>
+            <Button size="sm" variant="destructive" onClick={handleTakeOver}>
+              Take Over Now
+            </Button>
+          </div>
+        )}
+        {lead.bot_paused && !humanActive && !lead.needs_human && (
+          <div className="bg-yellow-50 dark:bg-yellow-950 border-b border-yellow-200 dark:border-yellow-800 px-6 py-3 flex items-center gap-2 text-yellow-700 dark:text-yellow-300">
+            <Pause className="h-5 w-5" />
+            <span className="font-medium">Bot Paused</span>
+            <span className="text-sm">— The bot stopped responding. Take over to reply manually.</span>
+          </div>
+        )}
 
         {/* Conversation Thread */}
         <ConversationThread conversation={conversation} />

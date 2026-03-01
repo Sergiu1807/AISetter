@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { NeedsAttentionList } from '@/components/dashboard/NeedsAttentionList'
@@ -8,6 +8,7 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity'
 import { Users, MessageSquare, Calendar, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Lead } from '@/types/lead.types'
+import { useRealtimeLeads } from '@/hooks/useRealtime'
 
 export default function DashboardPage() {
   const { profile, role } = useAuth()
@@ -15,22 +16,26 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(true)
 
   // Fetch leads for stats calculation
-  useEffect(() => {
-    const fetchLeads = async () => {
-      try {
-        const res = await fetch('/api/leads')
-        if (res.ok) {
-          const data = await res.json()
-          setLeads(data.leads || [])
-        }
-      } catch (error) {
-        console.error('Error fetching leads:', error)
-      } finally {
-        setStatsLoading(false)
+  const fetchLeads = useCallback(async () => {
+    try {
+      const res = await fetch('/api/leads')
+      if (res.ok) {
+        const data = await res.json()
+        setLeads(data.leads || [])
       }
+    } catch (error) {
+      console.error('Error fetching leads:', error)
+    } finally {
+      setStatsLoading(false)
     }
-    fetchLeads()
   }, [])
+
+  useEffect(() => {
+    fetchLeads()
+  }, [fetchLeads])
+
+  // Real-time: re-fetch stats when leads change
+  useRealtimeLeads(fetchLeads)
 
   // Calculate real stats from leads data
   const today = new Date()

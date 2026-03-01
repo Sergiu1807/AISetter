@@ -39,4 +39,6 @@ export interface ProcessMessageInput {
   message: string;
   leadSource?: string;
   mediaAttachments?: MediaAttachment[];
+  mediaUrl?: string;
+  mediaType?: 'image' | 'voice' | 'video';
 }

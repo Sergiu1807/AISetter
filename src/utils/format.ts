@@ -3,7 +3,7 @@ import type { Message } from '@/types/lead.types';
 
 /**
  * Split response into message chunks for ManyChat (max 6 chunks)
- * Uses weighted randomization (1-4 chunks) for human-like message variation
+ * Uses weighted randomization (1-6 chunks, bell-curve) for human-like message variation
  */
 export function splitIntoMessageChunks(text: string, maxChunks: number = 6): string[] {
   if (!text || text.trim().length === 0) {
@@ -26,31 +26,36 @@ export function splitIntoMessageChunks(text: string, maxChunks: number = 6): str
     segments = splitBySentences(trimmedText);
   }
 
-  // Step 2: Determine target chunk count (randomized, weighted toward 1-3)
-  const targetChunks = getRandomChunkTarget(segments.length);
+  // Step 2: Determine target chunk count (randomized 1-6, bell-curve)
+  const targetChunks = getRandomChunkTarget();
 
-  // Step 3: Merge segments to match target
-  const finalChunks = mergeToTarget(segments, targetChunks);
+  // Step 3: Adjust segments to match target (merge down or expand up)
+  let finalChunks: string[];
+  if (segments.length > targetChunks) {
+    finalChunks = mergeToTarget(segments, targetChunks);
+  } else if (segments.length < targetChunks) {
+    finalChunks = expandToTarget(segments, targetChunks);
+  } else {
+    finalChunks = segments;
+  }
 
   // Step 4: Cap at ManyChat max
   return finalChunks.slice(0, maxChunks);
 }
 
 /**
- * Weighted random chunk target:
- * 1 chunk: 25%, 2 chunks: 35%, 3 chunks: 25%, 4 chunks: 15%
+ * Weighted random chunk target (bell-curve centered on 2-3):
+ * 1 chunk: 15%, 2 chunks: 20%, 3 chunks: 25%, 4 chunks: 20%, 5 chunks: 12%, 6 chunks: 8%
  */
-function getRandomChunkTarget(availableSegments: number): number {
+function getRandomChunkTarget(): number {
   const rand = Math.random();
-  let target: number;
 
-  if (rand < 0.25) target = 1;
-  else if (rand < 0.60) target = 2;
-  else if (rand < 0.85) target = 3;
-  else target = 4;
-
-  // Can't have more chunks than segments
-  return Math.min(target, availableSegments);
+  if (rand < 0.15) return 1;
+  if (rand < 0.35) return 2;
+  if (rand < 0.60) return 3;
+  if (rand < 0.80) return 4;
+  if (rand < 0.92) return 5;
+  return 6;
 }
 
 /**
@@ -82,6 +87,66 @@ function mergeToTarget(segments: string[], target: number): string[] {
   }
 
   return result;
+}
+
+/**
+ * Expand segments up to target by splitting the longest multi-sentence segments
+ */
+function expandToTarget(segments: string[], target: number): string[] {
+  const result = [...segments];
+
+  while (result.length < target) {
+    // Find the longest segment that contains multiple sentences
+    let longestIdx = -1;
+    let longestLen = 0;
+
+    for (let i = 0; i < result.length; i++) {
+      if (result[i].length > longestLen && hasMultipleSentences(result[i])) {
+        longestLen = result[i].length;
+        longestIdx = i;
+      }
+    }
+
+    if (longestIdx === -1) break; // No more splittable segments
+
+    const [part1, part2] = splitAtBestBoundary(result[longestIdx]);
+    if (!part1.trim() || !part2.trim()) break; // Safety: avoid empty chunks
+    result.splice(longestIdx, 1, part1, part2);
+  }
+
+  return result;
+}
+
+/**
+ * Check if a text contains more than one sentence
+ */
+function hasMultipleSentences(text: string): boolean {
+  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  return !!sentences && sentences.length >= 2;
+}
+
+/**
+ * Split a text into two parts at the best sentence boundary (closest to middle)
+ */
+function splitAtBestBoundary(text: string): [string, string] {
+  const sentenceEnds = [...text.matchAll(/[.!?]+\s+/g)];
+  if (sentenceEnds.length === 0) return [text, ''];
+
+  const midpoint = text.length / 2;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+
+  for (let i = 0; i < sentenceEnds.length; i++) {
+    const pos = (sentenceEnds[i].index ?? 0) + sentenceEnds[i][0].length;
+    const dist = Math.abs(pos - midpoint);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIdx = i;
+    }
+  }
+
+  const splitPos = (sentenceEnds[bestIdx].index ?? 0) + sentenceEnds[bestIdx][0].length;
+  return [text.slice(0, splitPos).trim(), text.slice(splitPos).trim()];
 }
 
 /**
