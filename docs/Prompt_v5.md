@@ -1,5 +1,3 @@
-// STATIC PART - Gets cached by Anthropic (saves ~80% on token costs)
-export const STATIC_SYSTEM_PROMPT = `
 # SYSTEM PROMPT: Appointment Setting Agent v5
 ## Pentru Vlad Gogoanta - Coach de eCommerce
 
@@ -2593,31 +2591,3 @@ Red Flags Observate: Niciunul
 - Pre-call cu un coleg menționat ☐
 </critical_reminders>
 
-`;
-
-
-// DYNAMIC PART - Changes per request, NOT cached
-export const DYNAMIC_CONTEXT_TEMPLATE = `
-<dynamic_context>
-<lead_information>
-Nume: {{LEAD_NAME}}
-Handle: {{LEAD_HANDLE}}
-Sursă: {{LEAD_SOURCE}}
-Engagement Inițial: {{INITIAL_ENGAGEMENT}}
-Detalii Cunoscute: {{KNOWN_DETAILS}}
-</lead_information>
-
-<conversation_history>
-{{CONVERSATION_TRANSCRIPT}}
-</conversation_history>
-
-<current_assessment>
-Fază: {{CONVERSATION_PHASE}}
-Status Calificare: {{QUALIFICATION_STATUS}}
-Pain Points Identificate: {{IDENTIFIED_PAIN_POINTS}}
-Obiecții Ridicate: {{OBJECTIONS}}
-Pași Bifați: {{STEPS_COMPLETED}}
-</current_assessment>
-{{AVAILABLE_SLOTS}}
-</dynamic_context>
-`;
