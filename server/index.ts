@@ -15,6 +15,7 @@ import knowledgeBaseRoutes from './routes/knowledge-base';
 import promptRoutes from './routes/prompt';
 import usersRoutes from './routes/users';
 import analyticsRoutes from './routes/analytics';
+import integrationsRoutes from './routes/integrations';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use(knowledgeBaseRoutes);
 app.use(promptRoutes);
 app.use(usersRoutes);
 app.use(analyticsRoutes);
+app.use(integrationsRoutes);
 
 // 404 handler
 app.use((_req, res) => {

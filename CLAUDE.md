@@ -38,7 +38,7 @@ Vercel (Frontend)              Railway (Backend API)
 - **Frontend:** Next.js 14, TypeScript, Tailwind CSS + shadcn/ui
 - **Backend:** Express.js on Railway (Node.js 20)
 - **Database:** Supabase (PostgreSQL) with RLS
-- **AI:** Anthropic Claude (`claude-sonnet-4-5-20250929`) with prompt caching
+- **AI:** Anthropic Claude (`claude-sonnet-4-6`) with prompt caching
 - **Integrations:** ManyChat (Instagram DMs), GHL (calendar booking)
 
 ## Key Conventions

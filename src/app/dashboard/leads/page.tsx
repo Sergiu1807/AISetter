@@ -316,14 +316,6 @@ export default function LeadsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleBulkAction('assign')}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Assign to User
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleBulkAction('tag')}>
-                  <Tag className="mr-2 h-4 w-4" />
-                  Add Tags
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleBulkAction('pause')}>
                   <Pause className="mr-2 h-4 w-4" />
                   Pause Bot
@@ -659,8 +651,6 @@ export default function LeadsPage() {
                           <DropdownMenuItem asChild>
                             <Link href={`/dashboard/leads/${lead.id}`}>View Details</Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>Assign to User</DropdownMenuItem>
-                          <DropdownMenuItem>Add Tags</DropdownMenuItem>
                           <DropdownMenuItem>
                             {lead.bot_paused ? 'Resume Bot' : 'Pause Bot'}
                           </DropdownMenuItem>

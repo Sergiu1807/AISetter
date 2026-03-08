@@ -282,14 +282,6 @@ export default function LiveFeedPage() {
         )}
       </div>
 
-      {/* Load More (placeholder for pagination) */}
-      {filteredActivities.length >= 20 && (
-        <div className="flex justify-center pt-4">
-          <Button variant="outline" onClick={() => alert('Load more functionality')}>
-            Load More Activities
-          </Button>
-        </div>
-      )}
 
       {/* Settings */}
       <Card className="mt-6">

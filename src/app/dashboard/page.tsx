@@ -188,17 +188,6 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400">{role}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Team Members
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Offline - 2h ago
-                  </p>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>

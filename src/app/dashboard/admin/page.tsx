@@ -90,6 +90,16 @@ export default function AdminPage() {
   const [formSaving, setFormSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  // Integration status state
+  const [integrationStatus, setIntegrationStatus] = useState<Record<string, { status: string; label: string }>>({})
+
+  useEffect(() => {
+    fetch('/api/integrations/status')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.integrations) setIntegrationStatus(data.integrations) })
+      .catch(() => {})
+  }, [])
+
   // Fetch users
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true)
@@ -269,35 +279,17 @@ export default function AdminPage() {
   }
 
   const integrations = [
-    {
-      name: 'ManyChat',
-      status: process.env.NEXT_PUBLIC_MANYCHAT_API_KEY ? 'connected' : 'disconnected',
-      lastSync: '5 minutes ago',
-      apiKey: process.env.NEXT_PUBLIC_MANYCHAT_API_KEY ? 'mc_live_••••••••' : null,
-      envVar: 'MANYCHAT_API_KEY',
-    },
-    {
-      name: 'Anthropic API',
-      status: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY ? 'connected' : 'disconnected',
-      lastSync: 'just now',
-      apiKey: process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY ? 'sk-ant-••••••••' : null,
-      envVar: 'ANTHROPIC_API_KEY',
-    },
-    {
-      name: 'Supabase',
-      status: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'connected' : 'disconnected',
-      lastSync: 'just now',
-      apiKey: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'https://••••••••' : null,
-      envVar: 'NEXT_PUBLIC_SUPABASE_URL',
-    },
-    {
-      name: 'Calendly',
-      status: 'disconnected',
-      lastSync: 'never',
-      apiKey: null,
-      envVar: 'CALENDAR_LINK',
-    },
-  ]
+    { key: 'manychat', name: 'ManyChat', envVar: 'MANYCHAT_API_KEY' },
+    { key: 'anthropic', name: 'Anthropic API', envVar: 'ANTHROPIC_API_KEY' },
+    { key: 'supabase', name: 'Supabase', envVar: 'SUPABASE_URL' },
+    { key: 'ghl', name: 'GHL Calendar', envVar: 'GHL_CALENDAR_ID' },
+    { key: 'telegram', name: 'Telegram', envVar: 'TELEGRAM_BOT_TOKEN' },
+    { key: 'gemini', name: 'Gemini (Media)', envVar: 'GEMINI_API_KEY' },
+    { key: 'openai', name: 'OpenAI (Voice)', envVar: 'OPENAI_API_KEY' },
+  ].map(i => ({
+    ...i,
+    status: integrationStatus[i.key]?.status ?? 'unknown',
+  }))
 
   return (
     <div className="flex-1 space-y-6 p-8">
@@ -752,6 +744,9 @@ export default function AdminPage() {
 
         {/* Integrations Tab */}
         <TabsContent value="integrations" className="space-y-4">
+          {Object.keys(integrationStatus).length === 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-4">Se încarcă statusul integrărilor...</p>
+          )}
           {integrations.map((integration) => (
             <Card key={integration.name}>
               <CardHeader>
@@ -761,7 +756,7 @@ export default function AdminPage() {
                     <div>
                       <CardTitle>{integration.name}</CardTitle>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Last sync: {integration.lastSync}
+                        Env var: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded text-xs">{integration.envVar}</code>
                       </p>
                     </div>
                   </div>
@@ -769,39 +764,13 @@ export default function AdminPage() {
                     <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                       Connected
                     </Badge>
+                  ) : integration.status === 'unknown' ? (
+                    <Badge variant="outline" className="text-gray-500">Loading...</Badge>
                   ) : (
-                    <Badge variant="outline">Disconnected</Badge>
+                    <Badge variant="outline" className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-700">Disconnected</Badge>
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      Environment Variable
-                    </label>
-                    <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-800">
-                      <code className="text-sm text-gray-900 dark:text-gray-100">
-                        {integration.envVar}
-                      </code>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      Status
-                    </label>
-                    <Input
-                      type="text"
-                      value={integration.apiKey || 'Not configured'}
-                      disabled
-                      className="font-mono"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
-                    Configure this integration by setting the <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">{integration.envVar}</code> environment variable in your <code>.env.local</code> file
-                  </p>
-                </div>
-              </CardContent>
             </Card>
           ))}
 

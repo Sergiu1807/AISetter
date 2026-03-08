@@ -107,10 +107,10 @@ export default function LeadDetailPage() {
       <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
         <LeadInfoSidebar
           lead={lead}
-          onPauseBot={() => alert('Pause bot clicked')}
-          onResumeBot={() => alert('Resume bot clicked')}
-          onAssign={() => alert('Assign clicked')}
-          onAddTags={() => alert('Add tags clicked')}
+          onPauseBot={handlePauseBot}
+          onResumeBot={handleResumeBot}
+          onAssign={() => {}}
+          onAddTags={() => {}}
         />
         <div className="flex-1 flex flex-col">
           {/* Header */}
@@ -253,15 +253,6 @@ export default function LeadDetailPage() {
     }
   }
 
-  const handleAssign = () => {
-    // TODO: Implement assign dialog
-    alert('Assign to user dialog would open here')
-  }
-
-  const handleAddTags = () => {
-    // TODO: Implement tags dialog
-    alert('Add tags dialog would open here')
-  }
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
@@ -271,8 +262,8 @@ export default function LeadDetailPage() {
           lead={lead}
           onPauseBot={handlePauseBot}
           onResumeBot={handleResumeBot}
-          onAssign={handleAssign}
-          onAddTags={handleAddTags}
+          onAssign={() => {}}
+          onAddTags={() => {}}
         />
       </div>
 
@@ -295,8 +286,8 @@ export default function LeadDetailPage() {
                     lead={lead}
                     onPauseBot={handlePauseBot}
                     onResumeBot={handleResumeBot}
-                    onAssign={handleAssign}
-                    onAddTags={handleAddTags}
+                    onAssign={() => {}}
+                    onAddTags={() => {}}
                   />
                 </SheetContent>
               </Sheet>

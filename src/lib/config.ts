@@ -38,4 +38,10 @@ export const config = {
   // GoHighLevel (for calendar booking)
   GHL_LOCATION_ID: getEnvVar('GHL_LOCATION_ID', false),
   GHL_CALENDAR_ID: getEnvVar('GHL_CALENDAR_ID', false),
+
+  // ManyChat flow IDs (optional — falls back to hardcoded default)
+  MANYCHAT_DELETE_FLOW_NS: getEnvVar('MANYCHAT_DELETE_FLOW_NS', false) || 'content20260126074113_204795',
+
+  // Dashboard URL used in Telegram escalation links
+  DASHBOARD_URL: getEnvVar('DASHBOARD_URL', false) || 'https://aisetter.iterio.ro',
 };

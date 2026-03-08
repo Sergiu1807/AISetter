@@ -15,10 +15,20 @@ import { createClient } from '@/lib/supabase/client'
 export default function SettingsPage() {
   const { profile, role } = useAuth()
   const [saving, setSaving] = useState(false)
+  const [profileSuccess, setProfileSuccess] = useState('')
+  const [profileError, setProfileError] = useState('')
 
   // Profile settings
   const [fullName, setFullName] = useState(profile?.full_name || '')
   const [email, setEmail] = useState(profile?.email || '')
+
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   // Notification preferences
   const [browserNotifications, setBrowserNotifications] = useState(
@@ -32,12 +42,10 @@ export default function SettingsPage() {
   )
 
   const handleSaveProfile = async () => {
-    if (!profile?.id) {
-      alert('Error: User profile not loaded')
-      return
-    }
-
+    if (!profile?.id) return
     setSaving(true)
+    setProfileError('')
+    setProfileSuccess('')
     try {
       const supabase = createClient()
       const { error } = await supabase
@@ -48,14 +56,45 @@ export default function SettingsPage() {
           updated_at: new Date().toISOString()
         } as never)
         .eq('id', profile.id)
-
       if (error) throw error
-      alert('Profile updated successfully!')
+      setProfileSuccess('Profil actualizat cu succes!')
     } catch (error) {
       console.error('Error saving profile:', error)
-      alert('Failed to save profile. Please try again.')
+      setProfileError('Eroare la salvare. Încearcă din nou.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleUpdatePassword = async () => {
+    setPasswordError('')
+    setPasswordSuccess('')
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Completează toate câmpurile.')
+      return
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Parola nouă trebuie să aibă minim 6 caractere.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Parolele nu coincid.')
+      return
+    }
+    setPasswordSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      setPasswordSuccess('Parola a fost actualizată!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error) {
+      console.error('Error updating password:', error)
+      setPasswordError(error instanceof Error ? error.message : 'Eroare la actualizarea parolei.')
+    } finally {
+      setPasswordSaving(false)
     }
   }
 
@@ -175,6 +214,13 @@ export default function SettingsPage() {
 
               <Separator />
 
+              {profileError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{profileError}</p>
+              )}
+              {profileSuccess && (
+                <p className="text-sm text-green-600 dark:text-green-400">{profileSuccess}</p>
+              )}
+
               <Button onClick={handleSaveProfile} disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </Button>
@@ -191,20 +237,47 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" />
+                <Input
+                  id="currentPassword"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Your current password"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" />
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                />
               </div>
 
-              <Button variant="outline">Update Password</Button>
+              {passwordError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
+              )}
+              {passwordSuccess && (
+                <p className="text-sm text-green-600 dark:text-green-400">{passwordSuccess}</p>
+              )}
+
+              <Button onClick={handleUpdatePassword} disabled={passwordSaving}>
+                {passwordSaving ? 'Updating...' : 'Update Password'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -284,31 +357,8 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label>Theme</Label>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Choose your preferred color theme
-                </p>
-                <div className="grid grid-cols-3 gap-4">
-                  <button className="p-4 border-2 border-primary rounded-lg bg-white text-gray-900">
-                    <div className="mb-2">☀️</div>
-                    <div className="text-sm font-medium">Light</div>
-                  </button>
-                  <button className="p-4 border-2 border-gray-300 dark:border-gray-700 rounded-lg bg-gray-900 text-gray-100">
-                    <div className="mb-2">🌙</div>
-                    <div className="text-sm font-medium">Dark</div>
-                  </button>
-                  <button className="p-4 border-2 border-gray-300 dark:border-gray-700 rounded-lg bg-gradient-to-br from-white to-gray-900 text-gray-900">
-                    <div className="mb-2">💻</div>
-                    <div className="text-sm font-medium">System</div>
-                  </button>
-                </div>
-              </div>
-
-              <Separator />
-
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Theme switching will be fully implemented in the next update
+                The dashboard uses your system color scheme (light or dark). Theme customization is managed via your OS/browser settings.
               </p>
             </CardContent>
           </Card>
@@ -328,9 +378,8 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Two-Factor Authentication</Label>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Add an extra layer of security to your account
+                    2FA is managed via Supabase Auth settings. Contact your system administrator to enable it.
                   </p>
-                  <Button variant="outline">Enable 2FA</Button>
                 </div>
 
                 <Separator />
@@ -338,9 +387,8 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Active Sessions</Label>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    View and manage your active login sessions
+                    Session management is handled automatically. Signing out removes all active sessions for this account.
                   </p>
-                  <Button variant="outline">View Sessions</Button>
                 </div>
               </CardContent>
             </Card>

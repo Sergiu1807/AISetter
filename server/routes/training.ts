@@ -310,7 +310,7 @@ router.post('/api/training/examples', requireAuth, async (req: AuthRequest, res:
     // Check user role (operator+ can submit)
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .select('role')
+      .select('role, full_name')
       .eq('id', userId)
       .single();
 
@@ -388,8 +388,27 @@ router.post('/api/training/examples', requireAuth, async (req: AuthRequest, res:
       }
     });
 
-    // TODO: Create notification for managers
-    // This would query for users with role='manager' and create notification records
+    // Notify managers and admins about new submission
+    const { data: managers } = await supabase
+      .from('users')
+      .select('id')
+      .in('role', ['admin', 'manager'])
+      .eq('is_active', true);
+
+    if (managers && managers.length > 0) {
+      const notifications = managers.map((manager: any) => ({
+        user_id: manager.id,
+        type: 'training_review',
+        title: 'New Training Example Pending Review',
+        message: `${userData.full_name} submitted a ${example_type} training example for review`,
+        link: `/dashboard/training?example=${example.id}`,
+        metadata: {
+          example_id: example.id,
+          example_type,
+        },
+      }));
+      await supabase.from('notifications').insert(notifications);
+    }
 
     return res.status(201).json({ example });
   } catch (error) {

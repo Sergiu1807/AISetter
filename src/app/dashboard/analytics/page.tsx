@@ -18,29 +18,46 @@ import {
   TrendingUp,
   Clock,
   Bot,
-  Download,
   Award,
 } from 'lucide-react'
 import type { Lead, LeadStatus, LeadPhase } from '@/types/lead.types'
 import { STATUS_COLORS, STATUS_LABELS } from '@/types/lead.types'
 import { KPIDashboard } from '@/components/dashboard/KPIDashboard'
 
+interface OverviewMetrics {
+  botVsHuman: { bot: number; human: number }
+  leadsThisMonth: number
+  leadsLastMonth: number
+  leadsChange: number
+  bookedThisMonth: number
+  bookedLastMonth: number
+  bookedChange: number
+}
+
 export default function AnalyticsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState('7days')
   const [activeView, setActiveView] = useState<'overview' | 'kpi'>('overview')
+  const [overviewMetrics, setOverviewMetrics] = useState<OverviewMetrics | null>(null)
 
   useEffect(() => {
     const fetchLeads = async () => {
       try {
-        const res = await fetch('/api/leads')
-        if (res.ok) {
-          const data = await res.json()
+        const [leadsRes, overviewRes] = await Promise.all([
+          fetch('/api/leads'),
+          fetch('/api/analytics/overview'),
+        ])
+        if (leadsRes.ok) {
+          const data = await leadsRes.json()
           setLeads(data.leads || [])
         }
+        if (overviewRes.ok) {
+          const data = await overviewRes.json()
+          setOverviewMetrics(data)
+        }
       } catch (error) {
-        console.error('Error fetching leads:', error)
+        console.error('Error fetching analytics:', error)
       } finally {
         setLoading(false)
       }
@@ -65,17 +82,12 @@ export default function AnalyticsPage() {
 
   const metrics = {
     totalLeads: leads.length,
-    totalLeadsChange: 12,
+    totalLeadsChange: overviewMetrics?.leadsChange ?? null,
     activeConversations: activeToday,
-    activeConversationsChange: 8,
     callsBooked: callsBooked,
-    callsBookedChange: 5,
+    callsBookedChange: overviewMetrics?.bookedChange ?? null,
     conversionRate: parseFloat(conversionRate),
-    conversionRateChange: 1.2,
-    avgResponseTime: 4.2,
-    avgResponseTimeChange: -0.8,
-    botVsHuman: { bot: 1847, human: 412 },
-    botVsHumanChange: 15,
+    botVsHuman: overviewMetrics?.botVsHuman ?? { bot: 0, human: 0 },
   }
 
   // Calculate phase funnel from real data
@@ -184,10 +196,6 @@ export default function AnalyticsPage() {
               </SelectContent>
             </Select>
           )}
-          <Button variant="outline" onClick={() => alert('Export functionality coming soon!')}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
 
@@ -207,9 +215,11 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalLeads}</div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              +{metrics.totalLeadsChange}% from last period
-            </p>
+            {metrics.totalLeadsChange !== null && (
+              <p className={`text-xs mt-1 ${metrics.totalLeadsChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {metrics.totalLeadsChange >= 0 ? '+' : ''}{metrics.totalLeadsChange}% vs luna trecută
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -225,8 +235,8 @@ export default function AnalyticsPage() {
             <div className="text-2xl font-bold">
               {metrics.activeConversations}
             </div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              +{metrics.activeConversationsChange}% from last period
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Activi azi
             </p>
           </CardContent>
         </Card>
@@ -239,9 +249,11 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.callsBooked}</div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              +{metrics.callsBookedChange} from last period
-            </p>
+            {metrics.callsBookedChange !== null && (
+              <p className={`text-xs mt-1 ${metrics.callsBookedChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {metrics.callsBookedChange >= 0 ? '+' : ''}{metrics.callsBookedChange}% vs luna trecută
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -257,26 +269,8 @@ export default function AnalyticsPage() {
             <div className="text-2xl font-bold">
               {metrics.conversionRate}%
             </div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              +{metrics.conversionRateChange}% from last period
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Avg Response Time */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Response Time
-            </CardTitle>
-            <Clock className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {metrics.avgResponseTime}m
-            </div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-              {metrics.avgResponseTimeChange}m from last period
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Din total lead-uri
             </p>
           </CardContent>
         </Card>
@@ -291,15 +285,13 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(
-                (metrics.botVsHuman.bot /
-                  (metrics.botVsHuman.bot + metrics.botVsHuman.human)) *
-                100
-              ).toFixed(0)}
+              {metrics.botVsHuman.bot + metrics.botVsHuman.human > 0
+                ? ((metrics.botVsHuman.bot / (metrics.botVsHuman.bot + metrics.botVsHuman.human)) * 100).toFixed(0)
+                : '0'}
               % Bot
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {metrics.botVsHuman.bot} bot / {metrics.botVsHuman.human} human
+              {metrics.botVsHuman.bot.toLocaleString()} bot / {metrics.botVsHuman.human.toLocaleString()} lead
             </p>
           </CardContent>
         </Card>
@@ -485,44 +477,56 @@ export default function AnalyticsPage() {
           <CardTitle>Key Insights</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
-            <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+          {/* Conversion rate insight */}
+          <div className={`flex items-start gap-3 p-3 rounded-lg border ${parseFloat(conversionRate) > 0 ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800'}`}>
+            <TrendingUp className={`h-5 w-5 flex-shrink-0 mt-0.5 ${parseFloat(conversionRate) > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
             <div>
-              <p className="text-sm font-semibold text-green-900 dark:text-green-100">
-                Strong Performance
+              <p className={`text-sm font-semibold ${parseFloat(conversionRate) > 0 ? 'text-green-900 dark:text-green-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                Rata de conversie: {conversionRate}%
               </p>
-              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                Your conversion rate is up 1.2% this period. P3 to P4 transition
-                has improved significantly.
+              <p className={`text-xs mt-1 ${parseFloat(conversionRate) > 0 ? 'text-green-700 dark:text-green-300' : 'text-gray-500'}`}>
+                {callsBooked} call-uri rezervate din {leads.length} lead-uri totale.
               </p>
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
-                Opportunity
-              </p>
-              <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                23% of leads drop off between P2 and P3. Consider optimizing the
-                qualification questions.
-              </p>
-            </div>
-          </div>
+          {/* Funnel drop-off insight */}
+          {phaseFunnel.length > 1 && (() => {
+            const maxDrop = phaseFunnel.reduce((best, curr, i) => {
+              if (i === 0 || phaseFunnel[i - 1].count === 0) return best;
+              const dropPct = Math.round(((phaseFunnel[i - 1].count - curr.count) / phaseFunnel[i - 1].count) * 100);
+              return dropPct > best.pct ? { pct: dropPct, from: phaseFunnel[i - 1].phase, to: curr.phase } : best;
+            }, { pct: 0, from: '', to: '' });
+            if (maxDrop.pct === 0) return null;
+            return (
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100">
+                    Drop-off principal: {maxDrop.from} → {maxDrop.to}
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                    {maxDrop.pct}% dintre lead-uri nu trec de {maxDrop.from}. Optimizează mesajele din această fază.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
-          <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                Automation Success
-              </p>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                Bot is handling 82% of messages, saving ~40 hours of manual work per
-                week.
-              </p>
+          {/* Bot automation insight */}
+          {metrics.botVsHuman.bot + metrics.botVsHuman.human > 0 && (
+            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <Bot className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  Automatizare: {((metrics.botVsHuman.bot / (metrics.botVsHuman.bot + metrics.botVsHuman.human)) * 100).toFixed(0)}% din mesaje
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  {metrics.botVsHuman.bot.toLocaleString()} mesaje trimise de bot, {metrics.botVsHuman.human.toLocaleString()} primite de la lead-uri.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 

@@ -21,6 +21,70 @@ interface MonthData {
   calls_booked: number;
 }
 
+// GET /api/analytics/overview
+// Returns real metrics for the overview page: bot vs human message counts,
+// period-over-period lead/booking changes, and avg response time.
+router.get('/api/analytics/overview', requireAuth, async (_req: AuthRequest, res: Response) => {
+  try {
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const endOfLastMonth = startOfThisMonth;
+
+    // Bot vs Human message counts (all time)
+    const { data: allMessages } = await supabase
+      .from('messages')
+      .select('sender_type');
+
+    const botMessages = (allMessages || []).filter((m: any) => m.sender_type === 'bot').length;
+    const humanMessages = (allMessages || []).filter((m: any) => m.sender_type === 'lead').length;
+
+    // Leads: this month vs last month
+    const { count: leadsThisMonth } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', startOfThisMonth);
+
+    const { count: leadsLastMonth } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', startOfLastMonth)
+      .lt('created_at', endOfLastMonth);
+
+    // Calls booked: this month vs last month (from activities)
+    const { count: bookedThisMonth } = await supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .eq('type', 'call_booked')
+      .gte('created_at', startOfThisMonth);
+
+    const { count: bookedLastMonth } = await supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .eq('type', 'call_booked')
+      .gte('created_at', startOfLastMonth)
+      .lt('created_at', endOfLastMonth);
+
+    const calcChange = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return Math.round(((current - previous) / previous) * 100);
+    };
+
+    res.json({
+      botVsHuman: { bot: botMessages, human: humanMessages },
+      leadsThisMonth: leadsThisMonth || 0,
+      leadsLastMonth: leadsLastMonth || 0,
+      leadsChange: calcChange(leadsThisMonth || 0, leadsLastMonth || 0),
+      bookedThisMonth: bookedThisMonth || 0,
+      bookedLastMonth: bookedLastMonth || 0,
+      bookedChange: calcChange(bookedThisMonth || 0, bookedLastMonth || 0),
+    });
+  } catch (error) {
+    console.error('Error fetching overview analytics:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/analytics/kpi?year=2026
 router.get('/api/analytics/kpi', requireAuth, async (req: AuthRequest, res: Response) => {
   try {

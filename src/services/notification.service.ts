@@ -1,8 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { sendTelegramMessage } from '@/lib/telegram';
+import { config } from '@/lib/config';
 import type { Lead } from '@/types/database.types';
-
-const DASHBOARD_URL = 'https://aisetter.iterio.ro';
 
 /**
  * Notify about an escalation event (in-app activity + Telegram).
@@ -47,7 +46,7 @@ export async function notifyEscalation(
     `<b>Motiv:</b> ${reason}`,
     `Fază: ${phase} | Status: ${status}`,
     ``,
-    `\u{1F449} <a href="${DASHBOARD_URL}/dashboard/leads/${lead.id}">Deschide în Dashboard</a>`,
+    `\u{1F449} <a href="${config.DASHBOARD_URL}/dashboard/leads/${lead.id}">Deschide în Dashboard</a>`,
   ].join('\n');
 
   await sendTelegramMessage(telegramText);

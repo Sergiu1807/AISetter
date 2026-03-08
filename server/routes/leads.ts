@@ -2,9 +2,9 @@ import { Router, Response } from 'express';
 import { AuthRequest, requireAuth } from '../middleware/auth';
 import { supabase } from '../lib/supabase';
 import { manychatClient } from '@/lib/manychat';
+import { config } from '@/lib/config';
 
 const router = Router();
-const MANYCHAT_DELETE_FLOW_NS = 'content20260126074113_204795';
 
 // GET /api/leads
 router.get('/api/leads', requireAuth, async (req: AuthRequest, res: Response) => {
@@ -107,7 +107,7 @@ router.delete('/api/leads', requireAuth, async (req: AuthRequest, res: Response)
       await Promise.allSettled(
         leadsToDelete
           .filter((l: any) => l.manychat_user_id)
-          .map((l: any) => manychatClient.sendFlow(l.manychat_user_id, MANYCHAT_DELETE_FLOW_NS).catch(() => {}))
+          .map((l: any) => manychatClient.sendFlow(l.manychat_user_id, config.MANYCHAT_DELETE_FLOW_NS).catch(() => {}))
       );
     }
 
@@ -195,7 +195,7 @@ router.delete('/api/leads/:id', requireAuth, async (req: AuthRequest, res: Respo
       .from('leads').select('manychat_user_id').eq('id', req.params.id).single();
 
     if (lead?.manychat_user_id) {
-      await manychatClient.sendFlow(lead.manychat_user_id, MANYCHAT_DELETE_FLOW_NS).catch(() => {});
+      await manychatClient.sendFlow(lead.manychat_user_id, config.MANYCHAT_DELETE_FLOW_NS).catch(() => {});
     }
 
     const { error } = await supabase.from('leads').delete().eq('id', req.params.id);
