@@ -6,11 +6,20 @@ export type ActivityType =
   | 'message_received'
   | 'phase_change'
   | 'call_booked'
+  | 'booking_failed'
   | 'human_takeover'
   | 'bot_resumed'
+  | 'escalation'
   | 'error'
   | 'lead_qualified'
   | 'lead_disqualified'
+  | 'training_example_submitted'
+  | 'training_example_approved'
+  | 'training_example_rejected'
+  | 'training_review'
+  | 'prompt_version_deployed'
+  | 'prompt_version_created'
+  | 'prompt_deployed'
 
 export interface Activity {
   id: string
@@ -114,5 +123,68 @@ export const ACTIVITY_CONFIG: Record<
     bgColor: 'bg-gray-50 dark:bg-gray-900',
     borderColor: 'border-gray-200 dark:border-gray-800',
     label: 'Lead Disqualified',
+  },
+  booking_failed: {
+    icon: '🚫',
+    color: 'text-red-700 dark:text-red-300',
+    bgColor: 'bg-red-50 dark:bg-red-950',
+    borderColor: 'border-red-200 dark:border-red-800',
+    label: 'Booking Failed',
+  },
+  escalation: {
+    icon: '🚨',
+    color: 'text-orange-700 dark:text-orange-300',
+    bgColor: 'bg-orange-50 dark:bg-orange-950',
+    borderColor: 'border-orange-200 dark:border-orange-800',
+    label: 'Escalation',
+  },
+  training_example_submitted: {
+    icon: '📝',
+    color: 'text-blue-700 dark:text-blue-300',
+    bgColor: 'bg-blue-50 dark:bg-blue-950',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+    label: 'Training Submitted',
+  },
+  training_example_approved: {
+    icon: '✅',
+    color: 'text-green-700 dark:text-green-300',
+    bgColor: 'bg-green-50 dark:bg-green-950',
+    borderColor: 'border-green-200 dark:border-green-800',
+    label: 'Training Approved',
+  },
+  training_example_rejected: {
+    icon: '❌',
+    color: 'text-red-700 dark:text-red-300',
+    bgColor: 'bg-red-50 dark:bg-red-950',
+    borderColor: 'border-red-200 dark:border-red-800',
+    label: 'Training Rejected',
+  },
+  training_review: {
+    icon: '🔍',
+    color: 'text-yellow-700 dark:text-yellow-300',
+    bgColor: 'bg-yellow-50 dark:bg-yellow-950',
+    borderColor: 'border-yellow-200 dark:border-yellow-800',
+    label: 'Training Review',
+  },
+  prompt_version_deployed: {
+    icon: '🚀',
+    color: 'text-violet-700 dark:text-violet-300',
+    bgColor: 'bg-violet-50 dark:bg-violet-950',
+    borderColor: 'border-violet-200 dark:border-violet-800',
+    label: 'Prompt Deployed',
+  },
+  prompt_version_created: {
+    icon: '✏️',
+    color: 'text-violet-700 dark:text-violet-300',
+    bgColor: 'bg-violet-50 dark:bg-violet-950',
+    borderColor: 'border-violet-200 dark:border-violet-800',
+    label: 'Prompt Created',
+  },
+  prompt_deployed: {
+    icon: '🚀',
+    color: 'text-violet-700 dark:text-violet-300',
+    bgColor: 'bg-violet-50 dark:bg-violet-950',
+    borderColor: 'border-violet-200 dark:border-violet-800',
+    label: 'Prompt Deployed',
   },
 }

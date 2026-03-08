@@ -9,7 +9,13 @@ interface ActivityItemProps {
 }
 
 export function ActivityItem({ activity }: ActivityItemProps) {
-  const config = ACTIVITY_CONFIG[activity.type]
+  const config = ACTIVITY_CONFIG[activity.type] ?? {
+    icon: '📌',
+    color: 'text-gray-700 dark:text-gray-300',
+    bgColor: 'bg-gray-50 dark:bg-gray-900',
+    borderColor: 'border-gray-200 dark:border-gray-800',
+    label: activity.type,
+  }
 
   // Format time ago
   const formatTimeAgo = (timestamp: string) => {
