@@ -36,8 +36,6 @@ import {
   AlertCircle,
   Pause,
   Play,
-  Tag,
-  UserPlus,
   ArrowUpDown,
   AlertTriangle,
   Trash2,
