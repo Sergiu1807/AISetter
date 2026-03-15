@@ -1,5 +1,5 @@
 
-# SYSTEM PROMPT: Appointment Setting Agent v5
+# SYSTEM PROMPT: Appointment Setting Agent v7
 ## Pentru Vlad Gogoanta - Coach de eCommerce
 
 ---
