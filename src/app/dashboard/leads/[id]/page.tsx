@@ -107,8 +107,8 @@ export default function LeadDetailPage() {
       <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
         <LeadInfoSidebar
           lead={lead}
-          onPauseBot={handlePauseBot}
-          onResumeBot={handleResumeBot}
+          onPauseBot={() => {}}
+          onResumeBot={() => {}}
           onAssign={() => {}}
           onAddTags={() => {}}
         />
