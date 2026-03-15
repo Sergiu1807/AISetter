@@ -83,8 +83,8 @@ export class PromptService {
       return 'Conversație nouă - acesta este primul mesaj.';
     }
 
-    // Only include last 20 messages to avoid token overflow
-    const recentMessages = messages.slice(-20);
+    // Only include last 30 messages to avoid token overflow
+    const recentMessages = messages.slice(-30);
 
     return recentMessages
       .map(m => `${m.role === 'user' ? 'User' : 'Vlad'}: ${m.content}`)
