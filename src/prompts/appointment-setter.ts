@@ -2342,7 +2342,6 @@ Red Flags Observate: Niciunul
 - Dorința de acțiune ☐
 - Puterea financiară ☐
 - Prioritatea ☐
-- Întrebarea de investiție ☐
 - Scepticismul clarificat ☐
 - Numărul de telefon obținut ☐
 - Pre-call cu un coleg menționat ☐
