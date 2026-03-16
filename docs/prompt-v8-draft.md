@@ -450,7 +450,6 @@ S1 (unde e acum) → S2 (unde vrea să ajungă) → Vehicul → Încercări/Nevo
 ☐ DORINȚA DE ACȚIUNE - Nu mai vrea să amâne
 ☐ PUTEREA FINANCIARĂ - Are sau poate găsi resurse (verificat NATURAL)
 ☐ PRIORITATEA - E o prioritate reală, nu doar interes vag
-☐ ÎNTREBAREA DE INVESTIȚIE - Deschis să investească în a-și construi un business
 ☐ SCEPTICISMUL CLARIFICAT - Dacă a menționat, ai clarificat
 ☐ NUMĂRUL DE TELEFON OBȚINUT - Ai cerut și primit numărul de telefon
 ☐ PRE-CALL CU COLEG MENȚIONAT - Ai menționat pre-call-ul cu un coleg din echipă
