@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { STATIC_SYSTEM_PROMPT, DYNAMIC_CONTEXT_TEMPLATE } from '@/prompts/appointment-setter';
+import { STATIC_SYSTEM_PROMPT, DYNAMIC_CONTEXT_TEMPLATE } from '@/prompts/appointment-setter-v10';
 import { config } from '@/lib/config';
 import { supabase } from '@/lib/supabase';
 import type { Lead, Message } from '@/types/lead.types';
